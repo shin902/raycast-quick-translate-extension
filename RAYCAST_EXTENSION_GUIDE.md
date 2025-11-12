@@ -567,10 +567,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 async function translateWithGemini(
   text: string,
-  apiKey: string
+  apiKey: string,
+  modelName: string = "gemini-2.5-pro"
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+  const model = genAI.getGenerativeModel({ model: modelName });
 
   const prompt = `以下のテキストを日本語に翻訳してください：\n\n${text}`;
 
