@@ -160,8 +160,6 @@ const model = genAI.getGenerativeModel({ model: modelName });
 // 利用可能なモデル例:
 // - gemini-2.5-pro
 // - gemini-2.5-flash
-// - gemini-1.5-pro
-// - gemini-1.5-flash
 ```
 
 ### OCR処理（Phase 2）
