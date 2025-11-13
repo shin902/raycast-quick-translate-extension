@@ -10,7 +10,7 @@ Raycastで選択したテキストを日本語に翻訳するRaycast拡張機能
 - **TypeScript**: 型安全な開発
 - **React**: UI構築
 - **Google Gemini API**: テキスト翻訳に使用（gemini-2.5-pro）
-- **OCRライブラリ**: スクリーンショット翻訳用（Tesseract.js、Cloud Vision API等を検討）
+- **Tesseract.js**: スクリーンショット翻訳用OCRライブラリ（ローカル処理、無料）
 
 ## 主な機能
 
@@ -25,7 +25,7 @@ Raycastで選択したテキストを日本語に翻訳するRaycast拡張機能
 
 2. **スクリーンショット翻訳** (Phase 2)
    - スクリーンショットを撮影
-   - OCRライブラリ（Tesseract.js、Cloud Vision API等）でテキスト抽出
+   - Tesseract.jsでテキスト抽出
    - 抽出したテキストをGemini APIで日本語に翻訳
 
 ## 開発環境のセットアップ
@@ -88,7 +88,7 @@ raycast-quick-translate-extension/
 ### Phase 2: スクリーンショット翻訳機能
 
 1. ⬜ スクリーンショット撮影機能
-2. ⬜ OCRライブラリの選定と統合
+2. ⬜ Tesseract.jsの統合
 3. ⬜ OCRでテキスト抽出
 4. ⬜ Gemini APIで翻訳処理
 5. ⬜ UIの改善
@@ -164,23 +164,22 @@ const model = genAI.getGenerativeModel({ model: modelName });
 
 ### OCR処理（Phase 2）
 
-スクリーンショットからのテキスト抽出には、Geminiではなく専用のOCRライブラリを使用：
+スクリーンショットからのテキスト抽出には、Tesseract.jsを使用：
 
 ```typescript
-// オプション1: Tesseract.js（ローカル処理、無料）
 import Tesseract from 'tesseract.js';
 
+// 画像からテキストを抽出
 const { data: { text } } = await Tesseract.recognize(
   imageBuffer,
   'eng+jpn',  // 英語と日本語をサポート
+  {
+    logger: (m) => console.log(m), // 進捗状況をログ出力（オプション）
+  }
 );
 
-// オプション2: Cloud Vision API（高精度、有料）
-import vision from '@google-cloud/vision';
-
-const client = new vision.ImageAnnotatorClient();
-const [result] = await client.textDetection(imageBuffer);
-const text = result.fullTextAnnotation?.text;
+// 抽出したテキストをGemini APIで翻訳
+const translatedText = await translateWithGemini(text, apiKey);
 ```
 
 ## トラブルシューティング
