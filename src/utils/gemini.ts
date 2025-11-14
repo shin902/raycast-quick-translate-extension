@@ -7,6 +7,10 @@ import {
   API_KEY_FLEXIBLE_PATTERN,
   ERROR_MESSAGES,
   TRANSLATION_PROMPT_TEMPLATE,
+  GEMINI_MODELS,
+  MAX_RETRY_ATTEMPTS,
+  INITIAL_RETRY_DELAY_MS,
+  MODEL_FALLBACK_ORDER,
 } from "../constants";
 
 /**
@@ -78,7 +82,135 @@ function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: ()
 }
 
 /**
- * Translate text to Japanese using Google Gemini API with timeout protection
+ * Check if an error is a quota exceeded error
+ *
+ * @param error - The error to check
+ * @returns true if the error is a quota error, false otherwise
+ */
+function isQuotaError(error: Error): boolean {
+  return (
+    error.message.includes("quota") ||
+    error.message.includes("RESOURCE_EXHAUSTED") ||
+    error.message.includes("429 Too Many Requests") ||
+    error.message.includes("Too Many Requests")
+  );
+}
+
+/**
+ * Parse retry delay from error message
+ *
+ * @param errorMessage - The error message from the API
+ * @returns Delay in milliseconds, or null if no delay found
+ *
+ * @remarks
+ * Looks for patterns like "Please retry in 8.490937993s" or "retryDelay":"8s"
+ */
+function parseRetryDelay(errorMessage: string): number | null {
+  // Pattern 1: "Please retry in 8.490937993s"
+  const retryMatch = errorMessage.match(/retry in ([\d.]+)s/i);
+  if (retryMatch) {
+    return Math.ceil(parseFloat(retryMatch[1]) * 1000);
+  }
+
+  // Pattern 2: "retryDelay":"8s" or "retryDelay":"8.5s"
+  const jsonMatch = errorMessage.match(/"retryDelay"\s*:\s*"([\d.]+)s"/i);
+  if (jsonMatch) {
+    return Math.ceil(parseFloat(jsonMatch[1]) * 1000);
+  }
+
+  return null;
+}
+
+/**
+ * Sleep for a specified duration
+ *
+ * @param ms - Milliseconds to sleep
+ * @returns Promise that resolves after the specified duration
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Internal function to translate text using a specific model (without retry logic)
+ *
+ * @param sanitizedText - Pre-sanitized text to translate
+ * @param apiKey - Google Gemini API key
+ * @param modelName - The Gemini model to use
+ * @returns Translated text in Japanese
+ * @throws Error if API call fails or times out
+ *
+ * @remarks
+ * This is an internal function used by translateToJapanese.
+ * It does not implement retry logic or model fallback.
+ */
+async function translateWithModelInternal(
+  sanitizedText: string,
+  apiKey: string,
+  modelName: string,
+): Promise<string> {
+  // Create timeout with cleanup capability
+  const timeoutHandler = createTimeoutPromise(API_TIMEOUT_MS);
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: modelName });
+
+    // Use prompt template with clear delimiters to prevent injection
+    const prompt = TRANSLATION_PROMPT_TEMPLATE(sanitizedText);
+
+    // Race between API call and timeout
+    const translationPromise = model.generateContent(prompt);
+    const result = await Promise.race([translationPromise, timeoutHandler.promise]);
+
+    // Clean up timeout immediately after successful API call
+    timeoutHandler.cancel();
+
+    const response = result.response;
+
+    // Check if response is valid
+    if (!response) {
+      throw new Error(ERROR_MESSAGES.NO_RESPONSE);
+    }
+
+    const translatedText = response.text();
+
+    if (!translatedText || translatedText.trim().length === 0) {
+      throw new Error(ERROR_MESSAGES.EMPTY_TRANSLATION);
+    }
+
+    return translatedText.trim();
+  } catch (error) {
+    // Always clean up timeout on error
+    timeoutHandler.cancel();
+
+    if (error instanceof Error) {
+      // Handle timeout errors
+      if (error.message.includes("timed out")) {
+        throw error; // Re-throw timeout error as-is
+      }
+
+      // Handle specific API errors with original error context
+      if (error.message.includes("API_KEY_INVALID") || error.message.includes("API key")) {
+        throw new Error(
+          `Invalid API key: ${error.message}\n\nPlease check your Gemini API key in preferences.\nGet your API key from: https://makersuite.google.com/app/apikey`,
+        );
+      }
+      if (error.message.includes("model") || error.message.includes("NOT_FOUND")) {
+        throw new Error(`Invalid model selected: ${error.message}\n\nPlease check your model preference in settings.`);
+      }
+      if (error.message.includes("PERMISSION_DENIED")) {
+        throw new Error(`Permission denied: ${error.message}\n\nPlease check your API key permissions.`);
+      }
+      // Re-throw quota errors and other errors as-is for handling by caller
+      throw error;
+    }
+    throw new Error("An unexpected error occurred during translation");
+  }
+}
+
+/**
+ * Translate text to Japanese using Google Gemini API with retry logic and model fallback
  *
  * @param text - The text to translate (max 10,000 characters)
  * @param apiKey - Google Gemini API key (must start with "AIza")
@@ -90,6 +222,8 @@ function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: ()
  * - API calls timeout after 30 seconds
  * - Input is sanitized to remove problematic characters
  * - Prompt injection is mitigated by clear text delimiters
+ * - Implements retry with exponential backoff for quota errors (up to 3 attempts)
+ * - Automatically falls back to alternative models if quota is exceeded
  *
  * **Known Limitation**: If the timeout occurs, the underlying API request continues
  * in the background and cannot be cancelled. The @google/generative-ai library
@@ -126,68 +260,76 @@ export async function translateToJapanese(
     throw new Error(ERROR_MESSAGES.API_KEY_REQUIRED);
   }
 
-  // Create timeout with cleanup capability
-  const timeoutHandler = createTimeoutPromise(API_TIMEOUT_MS);
+  // Try the primary model first with retry logic
+  let lastError: Error | null = null;
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: modelName });
+  for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const result = await translateWithModelInternal(sanitizedText, apiKey, modelName);
+      return result;
+    } catch (error) {
+      if (error instanceof Error) {
+        lastError = error;
 
-    // Use prompt template with clear delimiters to prevent injection
-    const prompt = TRANSLATION_PROMPT_TEMPLATE(sanitizedText);
+        // If it's a quota error, try to retry with delay
+        if (isQuotaError(error)) {
+          // If this is the last attempt, break and try fallback models
+          if (attempt === MAX_RETRY_ATTEMPTS - 1) {
+            break;
+          }
 
-    // Race between API call and timeout
-    const translationPromise = model.generateContent(prompt);
-    const result = await Promise.race([translationPromise, timeoutHandler.promise]);
+          // Parse retry delay from error message, or use exponential backoff
+          const suggestedDelay = parseRetryDelay(error.message);
+          const retryDelay = suggestedDelay || INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
 
-    // Clean up timeout immediately after successful API call
-    timeoutHandler.cancel();
+          // Wait before retrying (max 10 seconds to avoid long waits)
+          await sleep(Math.min(retryDelay, 10000));
+          continue;
+        }
 
-    const response = result.response;
-
-    // Check if response is valid
-    if (!response) {
-      throw new Error(ERROR_MESSAGES.NO_RESPONSE);
+        // If it's not a quota error, throw immediately
+        throw error;
+      }
+      throw error;
     }
-
-    const translatedText = response.text();
-
-    if (!translatedText || translatedText.trim().length === 0) {
-      throw new Error(ERROR_MESSAGES.EMPTY_TRANSLATION);
-    }
-
-    return translatedText.trim();
-  } catch (error) {
-    // Always clean up timeout on error
-    timeoutHandler.cancel();
-    if (error instanceof Error) {
-      // Handle timeout errors
-      if (error.message.includes("timed out")) {
-        throw error; // Re-throw timeout error as-is
-      }
-
-      // Handle specific API errors with original error context
-      if (error.message.includes("API_KEY_INVALID") || error.message.includes("API key")) {
-        throw new Error(
-          `Invalid API key: ${error.message}\n\nPlease check your Gemini API key in preferences.\nGet your API key from: https://makersuite.google.com/app/apikey`,
-        );
-      }
-      if (error.message.includes("quota") || error.message.includes("RESOURCE_EXHAUSTED")) {
-        throw new Error(
-          `API quota exceeded: ${error.message}\n\nPlease try again later or check your quota at: https://console.cloud.google.com/`,
-        );
-      }
-      if (error.message.includes("model") || error.message.includes("NOT_FOUND")) {
-        throw new Error(`Invalid model selected: ${error.message}\n\nPlease check your model preference in settings.`);
-      }
-      if (error.message.includes("PERMISSION_DENIED")) {
-        throw new Error(`Permission denied: ${error.message}\n\nPlease check your API key permissions.`);
-      }
-      // Re-throw with context for debugging
-      throw new Error(`Translation failed: ${error.message}`);
-    }
-    throw new Error("An unexpected error occurred during translation");
   }
+
+  // If primary model failed with quota error, try fallback models
+  if (lastError && isQuotaError(lastError)) {
+    for (const fallbackModel of MODEL_FALLBACK_ORDER) {
+      // Don't try the same model again
+      if (fallbackModel === modelName) {
+        continue;
+      }
+
+      try {
+        const result = await translateWithModelInternal(sanitizedText, apiKey, fallbackModel);
+        // Success with fallback model
+        return result;
+      } catch (error) {
+        if (error instanceof Error) {
+          lastError = error;
+          // Continue to next fallback model if this one also has quota issues
+          if (isQuotaError(error)) {
+            continue;
+          }
+          // If it's not a quota error, throw immediately
+          throw error;
+        }
+        throw error;
+      }
+    }
+
+    // All models failed with quota errors
+    throw new Error(ERROR_MESSAGES.QUOTA_EXCEEDED(modelName, true));
+  }
+
+  // If we got here, something went wrong
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error("An unexpected error occurred during translation");
 }
 
 /**

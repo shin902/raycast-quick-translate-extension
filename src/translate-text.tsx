@@ -168,6 +168,8 @@ export default function TranslateText() {
   }, []);
 
   if (error) {
+    const isQuotaError = error.includes("quota") || error.includes("RESOURCE_EXHAUSTED") || error.includes("429");
+
     return (
       <Detail
         markdown={`# ❌ Translation Error
@@ -181,11 +183,18 @@ ${error}
    - Get your API key from: https://makersuite.google.com/app/apikey
    - Set it in Raycast preferences for this extension
 
-2. **Text Selection**
+2. **Quota/Rate Limit Issues** ${isQuotaError ? "⚠️ *Detected*" : ""}
+   - The extension automatically retries with exponential backoff
+   - It will also try alternative models (Gemini 1.5 Flash, 1.5 Pro) if quota is exceeded
+   - If all models fail, try again in a few minutes
+   - Check your quota at: https://console.cloud.google.com/
+   - Learn about rate limits: https://ai.google.dev/gemini-api/docs/rate-limits
+
+3. **Text Selection**
    - Select text before running this command
    - Or copy text to clipboard
 
-3. **Network Issues**
+4. **Network Issues**
    - Check your internet connection
    - Verify that you can access Google APIs
 `}
@@ -193,6 +202,20 @@ ${error}
           <ActionPanel>
             <Action.OpenInBrowser title="Get Gemini Api Key" url="https://makersuite.google.com/app/apikey" />
             <Action.Open title="Open Raycast Preferences" target="raycast://extensions/preferences" />
+            {isQuotaError && (
+              <>
+                <Action.OpenInBrowser
+                  title="Check API Quota"
+                  url="https://console.cloud.google.com/"
+                  shortcut={{ modifiers: ["cmd"], key: "q" }}
+                />
+                <Action.OpenInBrowser
+                  title="Learn About Rate Limits"
+                  url="https://ai.google.dev/gemini-api/docs/rate-limits"
+                  shortcut={{ modifiers: ["cmd"], key: "l" }}
+                />
+              </>
+            )}
           </ActionPanel>
         }
       />

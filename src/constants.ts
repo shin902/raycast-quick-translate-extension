@@ -8,6 +8,23 @@ export const MIN_API_KEY_LENGTH = 30; // Gemini API keys are typically 30+ chara
 export const MAX_TEXT_LENGTH = 10000; // Maximum text length based on Gemini API limits
 // Reference: https://ai.google.dev/gemini-api/docs/models/gemini#model-variations
 
+// Retry Configuration
+export const MAX_RETRY_ATTEMPTS = 3; // Maximum number of retry attempts for quota errors
+export const INITIAL_RETRY_DELAY_MS = 2000; // Initial delay for exponential backoff (2 seconds)
+
+// Gemini Models Configuration
+export const GEMINI_MODELS = {
+  FLASH_2_EXP: "gemini-2.0-flash-exp",
+  PRO_1_5: "gemini-1.5-pro",
+  FLASH_1_5: "gemini-1.5-flash",
+} as const;
+
+// Model fallback order when quota errors occur
+export const MODEL_FALLBACK_ORDER = [
+  GEMINI_MODELS.FLASH_1_5, // Try 1.5 Flash first (most likely to have quota)
+  GEMINI_MODELS.PRO_1_5, // Then try 1.5 Pro
+] as const;
+
 // Input Sanitization
 export const MAX_CONSECUTIVE_SPACES = 3; // Maximum consecutive spaces before normalization
 // Pattern for sanitization - compiled once for performance
@@ -36,6 +53,14 @@ export const ERROR_MESSAGES = {
   EMPTY_TRANSLATION: "Translation result is empty",
   TIMEOUT: (timeout: number) =>
     `Translation timed out after ${timeout / 1000} seconds. Please try again with shorter text or check your internet connection.`,
+  QUOTA_EXCEEDED: (modelName: string, triedFallback: boolean) => {
+    const baseMessage = `API quota exceeded for model: ${modelName}`;
+    const fallbackMessage = triedFallback
+      ? "\n\nAll alternative models also exceeded quota. Please try again later."
+      : "\n\nTip: Try switching to a different model in preferences (Gemini 1.5 Flash or 1.5 Pro may have available quota).";
+    return `${baseMessage}${fallbackMessage}\n\nCheck your quota at: https://console.cloud.google.com/\nLearn about rate limits: https://ai.google.dev/gemini-api/docs/rate-limits`;
+  },
+  ALL_MODELS_FAILED: "All available models exceeded quota. Please try again later or check your API quota.",
 } as const;
 
 // Prompt Templates
