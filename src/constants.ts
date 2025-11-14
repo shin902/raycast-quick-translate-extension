@@ -9,9 +9,10 @@ export const MAX_TEXT_LENGTH = 10000; // Maximum text length based on Gemini API
 // Reference: https://ai.google.dev/gemini-api/docs/models/gemini#model-variations
 
 // Retry Configuration
-export const MAX_RETRY_ATTEMPTS = 3; // Maximum number of retry attempts for quota errors
-export const INITIAL_RETRY_DELAY_MS = 2000; // Initial delay for exponential backoff (2 seconds)
-export const MAX_RETRY_DELAY_MS = 10000; // Maximum retry delay (10 seconds) to avoid long waits
+export const MAX_RETRY_ATTEMPTS = 2; // Maximum number of retry attempts for quota errors (reduced for better UX)
+export const INITIAL_RETRY_DELAY_MS = 2000; // 2s: Gemini API typical recovery time
+export const MAX_RETRY_DELAY_MS = 10000; // 10s: Balance between UX and API recovery
+export const OVERALL_TIMEOUT_MS = 60000; // 60s: Maximum total time for all retry/fallback attempts
 
 // Gemini Models Configuration
 export const GEMINI_MODELS = {
@@ -19,6 +20,9 @@ export const GEMINI_MODELS = {
   PRO_1_5: "gemini-1.5-pro",
   FLASH_1_5: "gemini-1.5-flash",
 } as const;
+
+// Type for Gemini model names (for better type safety)
+export type GeminiModelName = (typeof GEMINI_MODELS)[keyof typeof GEMINI_MODELS];
 
 // All available models for fallback (in priority order)
 export const ALL_AVAILABLE_MODELS = [
@@ -62,6 +66,8 @@ export const ERROR_MESSAGES = {
       : "\n\nTip: Try switching to a different model in preferences (Gemini 1.5 Flash or 1.5 Pro may have available quota).";
     return `${baseMessage}${fallbackMessage}\n\nCheck your quota at: https://console.cloud.google.com/\nLearn about rate limits: https://ai.google.dev/gemini-api/docs/rate-limits`;
   },
+  OVERALL_TIMEOUT: (seconds: number) =>
+    `Translation exceeded overall timeout of ${seconds} seconds after multiple retry attempts. Please try again later with shorter text.`,
 } as const;
 
 // Prompt Templates

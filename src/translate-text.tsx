@@ -103,11 +103,13 @@ export default function TranslateText() {
           setOriginalText(textToTranslate);
         }
 
-        // Show translating toast
+        // Show translating toast with retry info
         toast = await showToast({
           style: Toast.Style.Animated,
           title: "Translating...",
-          message: usedClipboard ? `Using clipboard (${geminiModel})` : `Using ${geminiModel}`,
+          message: usedClipboard
+            ? `Using clipboard (${geminiModel}, auto-retry enabled)`
+            : `Using ${geminiModel} (auto-retry enabled)`,
         });
 
         // Translate the text

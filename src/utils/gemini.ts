@@ -11,6 +11,9 @@ import {
   INITIAL_RETRY_DELAY_MS,
   MAX_RETRY_DELAY_MS,
   ALL_AVAILABLE_MODELS,
+  OVERALL_TIMEOUT_MS,
+  GEMINI_MODELS,
+  type GeminiModelName,
 } from "../constants";
 
 /**
@@ -219,10 +222,11 @@ async function translateWithModelInternal(
  * @throws Error if text is empty, too long, API call fails, or times out
  *
  * @remarks
- * - API calls timeout after 30 seconds
+ * - API calls timeout after 30 seconds per request
+ * - Overall timeout of 60 seconds for all retry/fallback attempts
  * - Input is sanitized to remove problematic characters
  * - Prompt injection is mitigated by clear text delimiters
- * - Implements retry with exponential backoff for quota errors (up to 3 attempts)
+ * - Implements retry with exponential backoff for quota errors (up to 2 attempts)
  * - Automatically falls back to alternative models if quota is exceeded
  *
  * **Known Limitation**: If the timeout occurs, the underlying API request continues
@@ -241,7 +245,7 @@ async function translateWithModelInternal(
 export async function translateToJapanese(
   text: string,
   apiKey: string,
-  modelName: string = "gemini-2.0-flash-exp",
+  modelName: GeminiModelName = GEMINI_MODELS.FLASH_2_EXP,
 ): Promise<string> {
   // Sanitize input text
   const sanitizedText = sanitizeInput(text);
@@ -260,10 +264,23 @@ export async function translateToJapanese(
     throw new Error(ERROR_MESSAGES.API_KEY_REQUIRED);
   }
 
+  // Track overall timeout to prevent excessive waiting
+  const overallStartTime = Date.now();
+
+  // Helper function to check if overall timeout exceeded
+  const checkOverallTimeout = () => {
+    if (Date.now() - overallStartTime > OVERALL_TIMEOUT_MS) {
+      throw new Error(ERROR_MESSAGES.OVERALL_TIMEOUT(OVERALL_TIMEOUT_MS / 1000));
+    }
+  };
+
   // Try the primary model first with retry logic
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+    // Check overall timeout before each attempt
+    checkOverallTimeout();
+
     try {
       const result = await translateWithModelInternal(sanitizedText, apiKey, modelName);
       return result;
@@ -301,7 +318,15 @@ export async function translateToJapanese(
     // Build dynamic fallback list excluding the primary model
     const fallbackModels = ALL_AVAILABLE_MODELS.filter((model) => model !== modelName);
 
+    // Guard against empty fallback list
+    if (fallbackModels.length === 0) {
+      throw new Error(ERROR_MESSAGES.QUOTA_EXCEEDED(modelName, true));
+    }
+
     for (const fallbackModel of fallbackModels) {
+      // Check overall timeout before trying fallback model
+      checkOverallTimeout();
+
       try {
         const result = await translateWithModelInternal(sanitizedText, apiKey, fallbackModel);
         // Success with fallback model
