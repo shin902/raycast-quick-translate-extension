@@ -1,17 +1,59 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// Constants for validation
-const MIN_API_KEY_LENGTH = 30; // Gemini API keys are typically 30+ characters
-const MAX_TEXT_LENGTH = 10000; // Maximum text length to prevent API quota issues
+import {
+  API_TIMEOUT_MS,
+  MIN_API_KEY_LENGTH,
+  MAX_TEXT_LENGTH,
+  API_KEY_FLEXIBLE_PATTERN,
+  ERROR_MESSAGES,
+  TRANSLATION_PROMPT_TEMPLATE,
+} from "../constants";
 
 /**
- * Translate text to Japanese using Google Gemini API
+ * Sanitize user input text to prevent issues
+ *
+ * @param text - The text to sanitize
+ * @returns Sanitized text
+ */
+function sanitizeInput(text: string): string {
+  return (
+    text
+      .trim()
+      // Normalize line breaks
+      .replace(/\r\n/g, "\n")
+      // Remove multiple consecutive spaces (but preserve intentional formatting)
+      .replace(/ {3,}/g, "  ")
+      // Remove zero-width characters that might cause issues
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+  );
+}
+
+/**
+ * Create a timeout promise that rejects after specified milliseconds
+ *
+ * @param ms - Timeout in milliseconds
+ * @returns Promise that rejects with timeout error
+ */
+function createTimeoutPromise(ms: number): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(ERROR_MESSAGES.TIMEOUT(ms)));
+    }, ms);
+  });
+}
+
+/**
+ * Translate text to Japanese using Google Gemini API with timeout protection
  *
  * @param text - The text to translate (max 10,000 characters)
- * @param apiKey - Google Gemini API key (must start with "AI")
+ * @param apiKey - Google Gemini API key (must start with "AIza")
  * @param modelName - The Gemini model to use (default: gemini-2.0-flash-exp)
  * @returns Translated text in Japanese
- * @throws Error if text is empty, too long, or API call fails
+ * @throws Error if text is empty, too long, API call fails, or times out
+ *
+ * @remarks
+ * - API calls timeout after 30 seconds
+ * - Input is sanitized to remove problematic characters
+ * - Prompt injection is mitigated by clear text delimiters
  *
  * @example
  * ```typescript
@@ -24,49 +66,55 @@ export async function translateToJapanese(
   apiKey: string,
   modelName: string = "gemini-2.0-flash-exp",
 ): Promise<string> {
+  // Sanitize input text
+  const sanitizedText = sanitizeInput(text);
+
   // Validate input text
-  if (!text || text.trim().length === 0) {
-    throw new Error("Text to translate cannot be empty");
+  if (!sanitizedText || sanitizedText.length === 0) {
+    throw new Error(ERROR_MESSAGES.EMPTY_TEXT);
   }
 
-  if (text.length > MAX_TEXT_LENGTH) {
-    throw new Error(`Text is too long (${text.length} characters). Maximum allowed: ${MAX_TEXT_LENGTH} characters`);
+  if (sanitizedText.length > MAX_TEXT_LENGTH) {
+    throw new Error(ERROR_MESSAGES.TEXT_TOO_LONG(sanitizedText.length));
   }
 
   // Validate API key
   if (!apiKey || apiKey.trim().length === 0) {
-    throw new Error("Gemini API key is required");
+    throw new Error(ERROR_MESSAGES.API_KEY_REQUIRED);
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
 
-    // Enhanced prompt that handles edge cases
-    const prompt = `以下のテキストを日本語に翻訳してください。
-既に日本語の場合はそのまま返してください。
-混在した言語の場合は、日本語以外の部分のみを翻訳してください。
-翻訳結果のみを返し、説明や注釈は不要です：
+    // Use prompt template with clear delimiters to prevent injection
+    const prompt = TRANSLATION_PROMPT_TEMPLATE(sanitizedText);
 
-${text}`;
+    // Race between API call and timeout
+    const translationPromise = model.generateContent(prompt);
+    const result = await Promise.race([translationPromise, createTimeoutPromise(API_TIMEOUT_MS)]);
 
-    const result = await model.generateContent(prompt);
     const response = result.response;
 
     // Check if response is valid
     if (!response) {
-      throw new Error("No response received from Gemini API");
+      throw new Error(ERROR_MESSAGES.NO_RESPONSE);
     }
 
     const translatedText = response.text();
 
     if (!translatedText || translatedText.trim().length === 0) {
-      throw new Error("Translation result is empty");
+      throw new Error(ERROR_MESSAGES.EMPTY_TRANSLATION);
     }
 
     return translatedText.trim();
   } catch (error) {
     if (error instanceof Error) {
+      // Handle timeout errors
+      if (error.message.includes("timed out")) {
+        throw error; // Re-throw timeout error as-is
+      }
+
       // Handle specific API errors with original error context
       if (error.message.includes("API_KEY_INVALID") || error.message.includes("API key")) {
         throw new Error(
@@ -98,25 +146,34 @@ ${text}`;
  * @returns true if the format appears valid, false otherwise
  *
  * @remarks
- * Gemini API keys must:
- * - Start with "AI"
- * - Be at least 30 characters long
- * - Contain only alphanumeric characters, underscores, or hyphens
+ * Gemini API keys typically follow this format:
+ * - Standard format: AIza[A-Za-z0-9_-]{35} (total 39 characters)
+ * - Example: AIzaSyD1234567890abcdefghijklmnopqrstuvwxyz
+ * - Prefix: "AIza" (standard) or "AI" (legacy/alternative formats)
+ * - Length: At least 30 characters
+ * - Characters: Alphanumeric, underscores, and hyphens only
+ *
+ * This function uses a flexible pattern to accommodate different key formats.
+ *
+ * @see https://ai.google.dev/gemini-api/docs/api-key - Official API key documentation
  *
  * @example
  * ```typescript
- * isValidApiKeyFormat("AIzaSyD...") // true
- * isValidApiKeyFormat("invalid") // false
+ * isValidApiKeyFormat("AIzaSyD1234567890...") // true (standard format)
+ * isValidApiKeyFormat("AI1234567890abcdef...") // true (flexible format)
+ * isValidApiKeyFormat("invalid") // false (too short)
+ * isValidApiKeyFormat("") // false (empty)
  * ```
  */
 export function isValidApiKeyFormat(apiKey: string): boolean {
   const trimmedKey = apiKey.trim();
 
-  // Check minimum length
+  // Check minimum length (Gemini API keys are at least 30 characters)
   if (trimmedKey.length < MIN_API_KEY_LENGTH) {
     return false;
   }
 
-  // Gemini API keys start with "AI" and contain alphanumeric characters, underscores, or hyphens
-  return /^AI[A-Za-z0-9_-]+$/.test(trimmedKey);
+  // Use flexible pattern to accommodate different key formats
+  // Matches keys starting with "AI" followed by alphanumeric, underscores, or hyphens
+  return API_KEY_FLEXIBLE_PATTERN.test(trimmedKey);
 }

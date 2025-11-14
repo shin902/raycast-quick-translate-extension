@@ -10,6 +10,7 @@ import {
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { translateToJapanese, isValidApiKeyFormat } from "./utils/gemini";
+import { MAX_TEXT_LENGTH, ERROR_MESSAGES } from "./constants";
 
 /**
  * User preferences interface for the extension
@@ -61,9 +62,7 @@ export default function TranslateText() {
 
         // Validate API key format
         if (!geminiApiKey || !isValidApiKeyFormat(geminiApiKey)) {
-          throw new Error(
-            "Invalid API key format. Please set a valid Gemini API key in preferences.\n\nGet your API key from: https://makersuite.google.com/app/apikey",
-          );
+          throw new Error(ERROR_MESSAGES.API_KEY_INVALID_FORMAT);
         }
 
         // Get text to translate
@@ -87,9 +86,13 @@ export default function TranslateText() {
         }
 
         if (!textToTranslate || textToTranslate.trim().length === 0) {
-          throw new Error(
-            "No text to translate.\n\nPlease either:\n1. Select text before running this command, or\n2. Copy text to clipboard",
-          );
+          throw new Error(ERROR_MESSAGES.NO_TEXT_TO_TRANSLATE);
+        }
+
+        // Pre-check text length to provide early feedback
+        const trimmedText = textToTranslate.trim();
+        if (trimmedText.length > MAX_TEXT_LENGTH) {
+          throw new Error(ERROR_MESSAGES.TEXT_TOO_LONG(trimmedText.length));
         }
 
         setOriginalText(textToTranslate);
@@ -157,7 +160,7 @@ ${error}
 `}
         actions={
           <ActionPanel>
-            <Action.OpenInBrowser title="Get Gemini API Key" url="https://makersuite.google.com/app/apikey" />
+            <Action.OpenInBrowser title="Get Gemini Api Key" url="https://makersuite.google.com/app/apikey" />
             <Action.Open title="Open Raycast Preferences" target="raycast://extensions/preferences" />
           </ActionPanel>
         }
@@ -193,7 +196,7 @@ ${originalText}
             shortcut={{ modifiers: ["cmd"], key: "c" }}
           />
           <Action.CopyToClipboard
-            title="Copy Both (Original + Translation)"
+            title="Copy Both (original + Translation)"
             content={`Original:\n${originalText}\n\nTranslation:\n${translatedText}`}
             shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
           />

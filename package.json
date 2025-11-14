@@ -7,6 +7,10 @@
   "author": "shin902",
   "categories": ["Productivity"],
   "license": "MIT",
+  "engines": {
+    "node": ">=22.14.0",
+    "npm": ">=7.0.0"
+  },
   "commands": [
     {
       "name": "translate-text",
