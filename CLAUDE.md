@@ -9,21 +9,36 @@ Raycastで選択したテキストを日本語に翻訳するRaycast拡張機能
 - **Raycast API**: macOS用ランチャーの拡張機能API
 - **TypeScript**: 型安全な開発
 - **React**: UI構築
-- **Google Gemini API**: テキスト翻訳に使用（gemini-2.5-pro）
-- **Tesseract.js**: スクリーンショット翻訳用OCRライブラリ（ローカル処理、無料）
+- **Google Gemini API**: テキスト翻訳に使用（gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash）
+- **Tesseract.js**: スクリーンショット翻訳用OCRライブラリ（ローカル処理、無料）※Phase 2で実装予定
 
 ## 主な機能
 
-### 実装予定機能
+### Phase 1: テキスト翻訳（✅ 実装済み）
 
-1. **テキスト翻訳** (Phase 1)
-   - 選択されたテキストをGemini API（gemini-2.5-pro）で日本語に翻訳
-   - クリップボードのテキストも翻訳可能
+1. **選択テキストの翻訳**
+   - 選択されたテキストをGemini APIで日本語に翻訳
+   - クリップボードのテキストも翻訳可能（フォールバック機能）
    - 翻訳結果をRaycast UIに表示
-   - 翻訳結果をクリップボードにコピー
-   - UIからGeminiモデルを簡単に変更可能（将来的な機能）
+   - 翻訳結果をクリップボードにコピー/ペースト
+   - キーボードショートカット対応
 
-2. **スクリーンショット翻訳** (Phase 2)
+2. **Geminiモデル選択機能**
+   - UIから使用するGeminiモデルを選択可能
+   - 対応モデル：
+     - **Gemini 2.0 Flash (Experimental)** - デフォルト、最新・最速
+     - **Gemini 1.5 Pro** - 高精度・複雑なタスク向け
+     - **Gemini 1.5 Flash** - 高速・効率的
+
+3. **包括的なエラーハンドリング**
+   - API Key検証（"AI"プレフィックス必須）
+   - 入力長チェック（最大10,000文字）
+   - 詳細なエラーメッセージと解決策の提示
+   - ネットワークエラー、クォータ超過などの適切な処理
+
+### Phase 2: スクリーンショット翻訳（⬜ 実装予定）
+
+1. **OCR機能**
    - スクリーンショットを撮影
    - Tesseract.jsでテキスト抽出
    - 抽出したテキストをGemini APIで日本語に翻訳
@@ -76,14 +91,16 @@ raycast-quick-translate-extension/
 
 ## 開発の進め方
 
-### Phase 1: テキスト翻訳機能
+### Phase 1: テキスト翻訳機能（✅ 完了）
 
 1. ✅ プロジェクト構造の作成
-2. ⬜ Gemini APIクライアントの実装
-3. ⬜ 選択テキスト取得機能
-4. ⬜ 翻訳UIの実装
-5. ⬜ エラーハンドリング
-6. ⬜ テスト
+2. ✅ Gemini APIクライアントの実装
+3. ✅ 選択テキスト取得機能
+4. ✅ 翻訳UIの実装
+5. ✅ エラーハンドリング
+6. ✅ モデル選択機能
+7. ✅ JSDocドキュメント
+8. ⬜ ユニットテスト（今後追加）
 
 ### Phase 2: スクリーンショット翻訳機能
 
@@ -136,31 +153,49 @@ import { Detail } from "@raycast/api";
 
 ### API呼び出し例
 
-```typescript
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
-
-// テキスト翻訳
-const prompt = `以下のテキストを日本語に翻訳してください：\n\n${text}`;
-const result = await model.generateContent(prompt);
-const translation = result.response.text();
-```
-
-### モデル選択機能（将来的な実装）
-
-UIからモデルを動的に選択できるようにする予定：
+実装済みのコードは`src/utils/gemini.ts`を参照してください。
 
 ```typescript
-// Preferencesまたはドロップダウンから選択
-const modelName = preferences.geminiModel || "gemini-2.5-pro";
-const model = genAI.getGenerativeModel({ model: modelName });
+import { translateToJapanese } from "./utils/gemini";
 
-// 利用可能なモデル例:
-// - gemini-2.5-pro
-// - gemini-2.5-flash
+// 基本的な使い方
+const translatedText = await translateToJapanese(
+  "Hello world",
+  apiKey,
+  "gemini-2.0-flash-exp"
+);
+
+// エラーハンドリング付き
+try {
+  const result = await translateToJapanese(text, apiKey, modelName);
+  console.log(result); // "こんにちは世界"
+} catch (error) {
+  console.error("Translation failed:", error.message);
+}
 ```
+
+### 対応Geminiモデル（実装済み）
+
+UIから以下のモデルを選択可能：
+
+```typescript
+// 利用可能なモデル:
+// - gemini-2.0-flash-exp  (デフォルト) - 最新の実験的モデル、高速
+// - gemini-1.5-pro        - 高精度、複雑なタスク向け
+// - gemini-1.5-flash      - バランス型、高速かつ正確
+
+// Preferencesから選択したモデルを取得
+const preferences = getPreferenceValues<Preferences>();
+const modelName = preferences.geminiModel; // ユーザーが選択したモデル
+```
+
+### 実装の特徴
+
+- ✅ API Key検証（"AI"プレフィックス必須）
+- ✅ 入力長制限（最大10,000文字）
+- ✅ 包括的なエラーハンドリング
+- ✅ 型安全なTypeScript実装
+- ✅ JSDocドキュメント完備
 
 ### OCR処理（Phase 2）
 
