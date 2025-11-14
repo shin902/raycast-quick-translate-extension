@@ -89,7 +89,10 @@ export default function TranslateText() {
           throw new Error(ERROR_MESSAGES.NO_TEXT_TO_TRANSLATE);
         }
 
-        // Pre-check text length to provide early feedback
+        // Pre-check text length to provide early feedback (UI-level check)
+        // Note: This is checked again in translateToJapanese() for safety (API-level check)
+        // - UI check: Provides immediate user feedback before API call
+        // - API check: Ensures safety even if called from other contexts
         const trimmedText = textToTranslate.trim();
         if (trimmedText.length > MAX_TEXT_LENGTH) {
           throw new Error(ERROR_MESSAGES.TEXT_TOO_LONG(trimmedText.length));
@@ -108,10 +111,18 @@ export default function TranslateText() {
         const translated = await translateToJapanese(textToTranslate, geminiApiKey, geminiModel);
         setTranslatedText(translated);
 
-        // Update toast to success
-        toast.style = Toast.Style.Success;
-        toast.title = "Translation completed!";
-        toast.message = undefined;
+        // Update toast to success (check if toast is still valid before mutating)
+        if (toast && !toast.isLoading) {
+          toast.style = Toast.Style.Success;
+          toast.title = "Translation completed!";
+          toast.message = undefined;
+        } else {
+          // Fallback: create new toast if original was dismissed
+          await showToast({
+            style: Toast.Style.Success,
+            title: "Translation completed!",
+          });
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
         setError(errorMessage);

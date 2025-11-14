@@ -3,6 +3,7 @@ import {
   API_TIMEOUT_MS,
   MIN_API_KEY_LENGTH,
   MAX_TEXT_LENGTH,
+  MAX_CONSECUTIVE_SPACES,
   API_KEY_FLEXIBLE_PATTERN,
   ERROR_MESSAGES,
   TRANSLATION_PROMPT_TEMPLATE,
@@ -13,32 +14,63 @@ import {
  *
  * @param text - The text to sanitize
  * @returns Sanitized text
+ *
+ * @remarks
+ * Performs the following sanitization:
+ * - Trims leading/trailing whitespace
+ * - Normalizes Unicode to NFC form
+ * - Converts CRLF to LF
+ * - Reduces excessive consecutive spaces
+ * - Removes zero-width and control characters
  */
 function sanitizeInput(text: string): string {
   return (
     text
       .trim()
-      // Normalize line breaks
+      // Normalize Unicode (NFC form for consistent character representation)
+      .normalize("NFC")
+      // Normalize line breaks (CRLF -> LF)
       .replace(/\r\n/g, "\n")
-      // Remove multiple consecutive spaces (but preserve intentional formatting)
-      .replace(/ {3,}/g, "  ")
+      // Remove multiple consecutive spaces (preserve intentional formatting)
+      .replace(new RegExp(` {${MAX_CONSECUTIVE_SPACES},}`, "g"), "  ")
       // Remove zero-width characters that might cause issues
       .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      // Remove control characters (except newline \n=0x0A, tab \t=0x09, carriage return \r=0x0D)
+      // Using Unicode escapes to avoid ESLint no-control-regex warning
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F]/g, "")
   );
 }
 
 /**
- * Create a timeout promise that rejects after specified milliseconds
+ * Create a timeout promise with cleanup capability
  *
  * @param ms - Timeout in milliseconds
- * @returns Promise that rejects with timeout error
+ * @returns Object with promise and cancel function
+ *
+ * @remarks
+ * Returns an object with:
+ * - promise: Promise that rejects after timeout
+ * - cancel: Function to clear the timeout timer
+ *
+ * Always call cancel() after the promise settles to prevent memory leaks
  */
-function createTimeoutPromise(ms: number): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => {
+function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: () => void } {
+  let timeoutId: NodeJS.Timeout;
+
+  const promise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
       reject(new Error(ERROR_MESSAGES.TIMEOUT(ms)));
     }, ms);
   });
+
+  const cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  return { promise, cancel };
 }
 
 /**
@@ -83,6 +115,9 @@ export async function translateToJapanese(
     throw new Error(ERROR_MESSAGES.API_KEY_REQUIRED);
   }
 
+  // Create timeout with cleanup capability
+  const timeoutHandler = createTimeoutPromise(API_TIMEOUT_MS);
+
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
@@ -92,7 +127,10 @@ export async function translateToJapanese(
 
     // Race between API call and timeout
     const translationPromise = model.generateContent(prompt);
-    const result = await Promise.race([translationPromise, createTimeoutPromise(API_TIMEOUT_MS)]);
+    const result = await Promise.race([translationPromise, timeoutHandler.promise]);
+
+    // Clean up timeout immediately after successful API call
+    timeoutHandler.cancel();
 
     const response = result.response;
 
@@ -109,6 +147,8 @@ export async function translateToJapanese(
 
     return translatedText.trim();
   } catch (error) {
+    // Always clean up timeout on error
+    timeoutHandler.cancel();
     if (error instanceof Error) {
       // Handle timeout errors
       if (error.message.includes("timed out")) {

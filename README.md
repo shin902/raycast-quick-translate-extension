@@ -72,6 +72,23 @@ The extension will:
 
 The extension will automatically try to use the clipboard content as a fallback.
 
+### Example Translation
+
+**Input (English)**:
+```
+Hello, world! How are you today?
+```
+
+**Output (Japanese)**:
+```
+こんにちは、世界！今日はお元気ですか？
+```
+
+The extension also handles:
+- Mixed language content (translates only non-Japanese parts)
+- Already Japanese text (returns as-is)
+- Long texts (up to 10,000 characters)
+
 ## Configuration
 
 ### Gemini Model Selection
@@ -136,6 +153,60 @@ Make sure to either:
 1. Check your internet connection
 2. Verify you can access Google APIs
 3. Check if you've exceeded API quota (free tier has limits)
+4. Try a different Gemini model (switch between Flash and Pro)
+
+### Raycast permission issues
+
+If the extension can't access selected text:
+1. Open **System Settings** > **Privacy & Security** > **Accessibility**
+2. Ensure **Raycast** is in the list and enabled
+3. If not, click the "+" button and add Raycast
+4. Restart Raycast after granting permissions
+
+### Translation timeout
+
+If translations timeout (after 30 seconds):
+1. Try shorter text (under 5,000 characters recommended)
+2. Check your network connection speed
+3. Switch to a faster model (gemini-2.0-flash-exp)
+
+## API Costs & Quotas
+
+### Gemini API Pricing
+
+The Google Gemini API offers a **generous free tier**:
+
+- **Free tier**: 15 requests per minute (RPM)
+- **Free tier**: 1 million tokens per day
+- **Character limit**: 10,000 characters per request (extension limit)
+
+For most personal use cases, the free tier is sufficient. See [official pricing](https://ai.google.dev/pricing) for details.
+
+### Cost Estimation
+
+**Example usage** (free tier):
+- ~500 translations/day (average 100 words each)
+- Suitable for personal translation needs
+- No credit card required for free tier
+
+**Paid tier** (if needed):
+- $0.00025 per 1K characters (Gemini 1.5 Flash)
+- $0.00125 per 1K characters (Gemini 1.5 Pro)
+- See [current pricing](https://ai.google.dev/pricing) for updates
+
+### Monitoring Usage
+
+Check your API usage at:
+- [Google AI Studio](https://makersuite.google.com/app/apikey)
+- [Google Cloud Console](https://console.cloud.google.com/)
+
+## Known Limitations
+
+- Maximum text length: 10,000 characters per translation
+- Requires stable internet connection
+- Translation accuracy depends on Gemini model quality
+- Currently supports translation to Japanese only
+- API rate limits apply (15 requests/minute on free tier)
 
 ## Phase 2 (Future)
 

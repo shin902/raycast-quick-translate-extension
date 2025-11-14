@@ -8,24 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- API timeout protection (30 seconds) to prevent hanging on slow connections
+- **Placeholder icon.png** (512x512px light blue gradient)
+- API timeout protection (30 seconds) with proper cleanup to prevent memory leaks
 - Input sanitization to remove problematic characters and normalize text
-- Prompt injection protection with clear text delimiters
+  - Unicode normalization (NFC form)
+  - Control character removal
+  - Zero-width character removal
+- Enhanced prompt injection protection with stronger delimiters
 - Text length pre-check in UI for early user feedback
 - Constants file for centralized configuration management
 - Comprehensive JSDoc documentation for all functions
 - Node.js and npm engine requirements in package.json
+- Detailed README sections:
+  - Example translations with input/output
+  - API costs and quotas information
+  - Extended troubleshooting guide (Raycast permissions, timeouts)
+  - Known limitations section
+- Explanatory comments for duplicate text length checks
 
 ### Changed
 - Improved API key validation with flexible pattern matching
 - Enhanced error messages with detailed context and troubleshooting links
 - Refactored constants to separate file for better maintainability
 - Updated API key validation comments with official documentation references
+- **Timeout implementation** now properly cleans up timers to prevent memory leaks
+- Magic numbers extracted to named constants (MAX_CONSECUTIVE_SPACES)
+- Toast mutation handling improved with validity checks and fallback
+- Prompt template enhanced with explicit instructions to prevent injection
 
 ### Fixed
-- Toast message race conditions by using single toast instance
+- **Critical**: Added missing icon.png asset file (blocker issue resolved)
+- **High Priority**: Memory leak from uncleaned timeout timers
+- Toast message race conditions with better state checking
 - Type safety for Gemini API responses with null checks
-- Magic numbers replaced with named constants
+- Potential race condition in toast updates
 
 ## [0.1.0] - 2025-01-14
 
