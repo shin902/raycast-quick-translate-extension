@@ -3,7 +3,7 @@ import {
   API_TIMEOUT_MS,
   MIN_API_KEY_LENGTH,
   MAX_TEXT_LENGTH,
-  MAX_CONSECUTIVE_SPACES,
+  CONSECUTIVE_SPACES_PATTERN,
   API_KEY_FLEXIBLE_PATTERN,
   ERROR_MESSAGES,
   TRANSLATION_PROMPT_TEMPLATE,
@@ -18,10 +18,13 @@ import {
  * @remarks
  * Performs the following sanitization:
  * - Trims leading/trailing whitespace
- * - Normalizes Unicode to NFC form
- * - Converts CRLF to LF
- * - Reduces excessive consecutive spaces
- * - Removes zero-width and control characters
+ * - Normalizes Unicode to NFC form (consistent character representation)
+ * - Converts CRLF to LF (consistent line endings)
+ * - Reduces excessive consecutive spaces (3+ spaces → 1 space)
+ * - Removes zero-width characters (invisible Unicode characters)
+ * - Removes control characters except newline/tab/CR
+ *
+ * Performance: Uses pre-compiled regex patterns from constants for efficiency
  */
 function sanitizeInput(text: string): string {
   return (
@@ -31,8 +34,9 @@ function sanitizeInput(text: string): string {
       .normalize("NFC")
       // Normalize line breaks (CRLF -> LF)
       .replace(/\r\n/g, "\n")
-      // Remove multiple consecutive spaces (preserve intentional formatting)
-      .replace(new RegExp(` {${MAX_CONSECUTIVE_SPACES},}`, "g"), "  ")
+      // Reduce excessive consecutive spaces to single space
+      // Rationale: 3+ spaces are likely formatting errors or copy-paste artifacts
+      .replace(CONSECUTIVE_SPACES_PATTERN, " ")
       // Remove zero-width characters that might cause issues
       .replace(/[\u200B-\u200D\uFEFF]/g, "")
       // Remove control characters (except newline \n=0x0A, tab \t=0x09, carriage return \r=0x0D)
@@ -86,6 +90,13 @@ function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: ()
  * - API calls timeout after 30 seconds
  * - Input is sanitized to remove problematic characters
  * - Prompt injection is mitigated by clear text delimiters
+ *
+ * **Known Limitation**: If the timeout occurs, the underlying API request continues
+ * in the background and cannot be cancelled. The @google/generative-ai library
+ * does not currently support AbortController for request cancellation. This means:
+ * - Network resources are used until the request completes naturally
+ * - API quota is consumed even if the user sees a timeout error
+ * - Consider this when setting timeout values
  *
  * @example
  * ```typescript

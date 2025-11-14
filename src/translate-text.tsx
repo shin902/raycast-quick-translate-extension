@@ -51,6 +51,7 @@ export default function TranslateText() {
      */
     async function translate() {
       let toast: Toast | undefined;
+      let isCancelled = false; // Flag to prevent state updates after unmount
 
       try {
         setIsLoading(true);
@@ -98,7 +99,9 @@ export default function TranslateText() {
           throw new Error(ERROR_MESSAGES.TEXT_TOO_LONG(trimmedText.length));
         }
 
-        setOriginalText(textToTranslate);
+        if (!isCancelled) {
+          setOriginalText(textToTranslate);
+        }
 
         // Show translating toast
         toast = await showToast({
@@ -109,42 +112,59 @@ export default function TranslateText() {
 
         // Translate the text
         const translated = await translateToJapanese(textToTranslate, geminiApiKey, geminiModel);
-        setTranslatedText(translated);
 
-        // Update toast to success (check if toast is still valid before mutating)
-        if (toast && !toast.isLoading) {
-          toast.style = Toast.Style.Success;
-          toast.title = "Translation completed!";
-          toast.message = undefined;
-        } else {
-          // Fallback: create new toast if original was dismissed
-          await showToast({
-            style: Toast.Style.Success,
-            title: "Translation completed!",
-          });
+        // Only update state if component is still mounted
+        if (!isCancelled) {
+          setTranslatedText(translated);
+
+          // Update toast to success
+          // When toast has Animated style, it should be in loading state
+          if (toast) {
+            toast.style = Toast.Style.Success;
+            toast.title = "Translation completed!";
+            toast.message = undefined;
+          }
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
-        setError(errorMessage);
+        if (!isCancelled) {
+          const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+          setError(errorMessage);
 
-        // Show or update toast with error
-        if (toast) {
-          toast.style = Toast.Style.Failure;
-          toast.title = "Translation failed";
-          toast.message = errorMessage.split("\n")[0]; // First line only for toast
-        } else {
-          await showToast({
-            style: Toast.Style.Failure,
-            title: "Translation failed",
-            message: errorMessage.split("\n")[0],
-          });
+          // Show or update toast with error
+          if (toast) {
+            toast.style = Toast.Style.Failure;
+            toast.title = "Translation failed";
+            toast.message = errorMessage.split("\n")[0]; // First line only for toast
+          } else {
+            await showToast({
+              style: Toast.Style.Failure,
+              title: "Translation failed",
+              message: errorMessage.split("\n")[0],
+            });
+          }
         }
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
+
+      // Return cleanup function
+      return () => {
+        isCancelled = true;
+      };
     }
 
-    translate();
+    const cleanup = translate();
+
+    // Cleanup on unmount
+    return () => {
+      if (cleanup) {
+        cleanup.then((cleanupFn) => {
+          if (cleanupFn) cleanupFn();
+        });
+      }
+    };
   }, []);
 
   if (error) {

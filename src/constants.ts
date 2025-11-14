@@ -10,6 +10,8 @@ export const MAX_TEXT_LENGTH = 10000; // Maximum text length based on Gemini API
 
 // Input Sanitization
 export const MAX_CONSECUTIVE_SPACES = 3; // Maximum consecutive spaces before normalization
+// Pattern for sanitization - compiled once for performance
+export const CONSECUTIVE_SPACES_PATTERN = / {3,}/g; // Matches 3 or more consecutive spaces
 
 // API Key Validation
 // Gemini API keys format: AIza[A-Za-z0-9_-]{35}

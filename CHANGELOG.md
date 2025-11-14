@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - API costs and quotas information
   - Extended troubleshooting guide (Raycast permissions, timeouts)
   - Known limitations section
+  - API key security best practices
 - Explanatory comments for duplicate text length checks
+- **useEffect cleanup** to prevent state updates on unmounted components
+- Pre-compiled regex patterns in constants for performance optimization
 
 ### Changed
 - Improved API key validation with flexible pattern matching
@@ -32,16 +35,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored constants to separate file for better maintainability
 - Updated API key validation comments with official documentation references
 - **Timeout implementation** now properly cleans up timers to prevent memory leaks
-- Magic numbers extracted to named constants (MAX_CONSECUTIVE_SPACES)
-- Toast mutation handling improved with validity checks and fallback
+- Magic numbers extracted to named constants (MAX_CONSECUTIVE_SPACES, CONSECUTIVE_SPACES_PATTERN)
+- **Toast mutation logic** simplified - removed incorrect `!toast.isLoading` condition
 - Prompt template enhanced with explicit instructions to prevent injection
+- **Input sanitization**: 3+ consecutive spaces now reduced to single space (was 2 spaces)
 
 ### Fixed
 - **Critical**: Added missing icon.png asset file (blocker issue resolved)
+- **Critical**: Toast mutation logic - removed inverted `!toast.isLoading` condition
+- **Critical**: useEffect cleanup - prevents state updates after component unmounts
 - **High Priority**: Memory leak from uncleaned timeout timers
 - Toast message race conditions with better state checking
 - Type safety for Gemini API responses with null checks
 - Potential race condition in toast updates
+- **Sanitization consistency**: Excessive spaces handling now clear and consistent
+- **Performance**: Regex patterns moved to constants (no runtime compilation)
+
+### Known Issues
+- **API cancellation limitation**: When timeout occurs, the underlying Gemini API request cannot be cancelled and continues in background. This is a limitation of the @google/generative-ai library which does not support AbortController. API quota is still consumed even on timeout.
+
+### Security
+- Added API key security notes to README
+- Documented secure storage in macOS Keychain
+- Added instructions for key rotation if exposed
 
 ## [0.1.0] - 2025-01-14
 

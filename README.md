@@ -36,6 +36,11 @@ npm install
    - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
    - Create a new API key
    - Copy the key
+   - **⚠️ Security Note**:
+     - Never commit your API key to version control
+     - Keep your API key confidential
+     - If exposed, immediately regenerate it at Google AI Studio
+     - Raycast stores API keys securely in the macOS Keychain
 
 4. Add an icon:
 ```bash
@@ -202,11 +207,13 @@ Check your API usage at:
 
 ## Known Limitations
 
-- Maximum text length: 10,000 characters per translation
-- Requires stable internet connection
-- Translation accuracy depends on Gemini model quality
-- Currently supports translation to Japanese only
-- API rate limits apply (15 requests/minute on free tier)
+- **Maximum text length**: 10,000 characters per translation
+- **Network dependency**: Requires stable internet connection
+- **Translation accuracy**: Depends on Gemini model quality
+- **Language support**: Currently supports translation to Japanese only
+- **API rate limits**: 15 requests/minute on free tier
+- **Timeout behavior**: If translation times out (30s), the API request continues in the background and consumes quota. The Gemini API library does not support request cancellation.
+- **Component lifecycle**: Translation continues even if you navigate away. Consider waiting for completion before switching views.
 
 ## Phase 2 (Future)
 
