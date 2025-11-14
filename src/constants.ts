@@ -11,6 +11,7 @@ export const MAX_TEXT_LENGTH = 10000; // Maximum text length based on Gemini API
 // Retry Configuration
 export const MAX_RETRY_ATTEMPTS = 3; // Maximum number of retry attempts for quota errors
 export const INITIAL_RETRY_DELAY_MS = 2000; // Initial delay for exponential backoff (2 seconds)
+export const MAX_RETRY_DELAY_MS = 10000; // Maximum retry delay (10 seconds) to avoid long waits
 
 // Gemini Models Configuration
 export const GEMINI_MODELS = {
@@ -19,10 +20,11 @@ export const GEMINI_MODELS = {
   FLASH_1_5: "gemini-1.5-flash",
 } as const;
 
-// Model fallback order when quota errors occur
-export const MODEL_FALLBACK_ORDER = [
+// All available models for fallback (in priority order)
+export const ALL_AVAILABLE_MODELS = [
   GEMINI_MODELS.FLASH_1_5, // Try 1.5 Flash first (most likely to have quota)
   GEMINI_MODELS.PRO_1_5, // Then try 1.5 Pro
+  GEMINI_MODELS.FLASH_2_EXP, // Finally try 2.0 Flash Experimental
 ] as const;
 
 // Input Sanitization
@@ -60,7 +62,6 @@ export const ERROR_MESSAGES = {
       : "\n\nTip: Try switching to a different model in preferences (Gemini 1.5 Flash or 1.5 Pro may have available quota).";
     return `${baseMessage}${fallbackMessage}\n\nCheck your quota at: https://console.cloud.google.com/\nLearn about rate limits: https://ai.google.dev/gemini-api/docs/rate-limits`;
   },
-  ALL_MODELS_FAILED: "All available models exceeded quota. Please try again later or check your API quota.",
 } as const;
 
 // Prompt Templates

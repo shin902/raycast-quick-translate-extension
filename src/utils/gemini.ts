@@ -7,10 +7,10 @@ import {
   API_KEY_FLEXIBLE_PATTERN,
   ERROR_MESSAGES,
   TRANSLATION_PROMPT_TEMPLATE,
-  GEMINI_MODELS,
   MAX_RETRY_ATTEMPTS,
   INITIAL_RETRY_DELAY_MS,
-  MODEL_FALLBACK_ORDER,
+  MAX_RETRY_DELAY_MS,
+  ALL_AVAILABLE_MODELS,
 } from "../constants";
 
 /**
@@ -268,54 +268,58 @@ export async function translateToJapanese(
       const result = await translateWithModelInternal(sanitizedText, apiKey, modelName);
       return result;
     } catch (error) {
-      if (error instanceof Error) {
-        lastError = error;
-
-        // If it's a quota error, try to retry with delay
-        if (isQuotaError(error)) {
-          // If this is the last attempt, break and try fallback models
-          if (attempt === MAX_RETRY_ATTEMPTS - 1) {
-            break;
-          }
-
-          // Parse retry delay from error message, or use exponential backoff
-          const suggestedDelay = parseRetryDelay(error.message);
-          const retryDelay = suggestedDelay || INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-
-          // Wait before retrying (max 10 seconds to avoid long waits)
-          await sleep(Math.min(retryDelay, 10000));
-          continue;
-        }
-
-        // If it's not a quota error, throw immediately
+      // Only handle Error instances
+      if (!(error instanceof Error)) {
         throw error;
       }
+
+      lastError = error;
+
+      // If it's a quota error, try to retry with delay
+      if (isQuotaError(error)) {
+        // If this is the last attempt, break and try fallback models
+        if (attempt === MAX_RETRY_ATTEMPTS - 1) {
+          break;
+        }
+
+        // Parse retry delay from error message, or use exponential backoff
+        const suggestedDelay = parseRetryDelay(error.message);
+        const retryDelay = suggestedDelay || INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+
+        // Wait before retrying (capped at MAX_RETRY_DELAY_MS)
+        await sleep(Math.min(retryDelay, MAX_RETRY_DELAY_MS));
+        continue;
+      }
+
+      // If it's not a quota error, throw immediately
       throw error;
     }
   }
 
   // If primary model failed with quota error, try fallback models
   if (lastError && isQuotaError(lastError)) {
-    for (const fallbackModel of MODEL_FALLBACK_ORDER) {
-      // Don't try the same model again
-      if (fallbackModel === modelName) {
-        continue;
-      }
+    // Build dynamic fallback list excluding the primary model
+    const fallbackModels = ALL_AVAILABLE_MODELS.filter((model) => model !== modelName);
 
+    for (const fallbackModel of fallbackModels) {
       try {
         const result = await translateWithModelInternal(sanitizedText, apiKey, fallbackModel);
         // Success with fallback model
         return result;
       } catch (error) {
-        if (error instanceof Error) {
-          lastError = error;
-          // Continue to next fallback model if this one also has quota issues
-          if (isQuotaError(error)) {
-            continue;
-          }
-          // If it's not a quota error, throw immediately
+        // Only handle Error instances
+        if (!(error instanceof Error)) {
           throw error;
         }
+
+        lastError = error;
+
+        // Continue to next fallback model if this one also has quota issues
+        if (isQuotaError(error)) {
+          continue;
+        }
+
+        // If it's not a quota error, throw immediately
         throw error;
       }
     }
