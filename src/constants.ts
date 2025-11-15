@@ -22,19 +22,22 @@ export const RETRY_BUFFER_TIME_MS = 1000; // 1s: Buffer time reserved before tim
 
 // Gemini Models Configuration
 export const GEMINI_MODELS = {
-  FLASH_2_EXP: "gemini-2.0-flash-exp",
-  PRO_1_5: "gemini-1.5-pro",
-  FLASH_1_5: "gemini-1.5-flash",
+  PRO_2_5: "gemini-2.5-pro",
+  FLASH_2_5: "gemini-2.5-flash",
+  FLASH_LITE_2_5: "gemini-2.5-flash-lite",
 } as const;
 
 // Type for Gemini model names (for better type safety)
 export type GeminiModelName = (typeof GEMINI_MODELS)[keyof typeof GEMINI_MODELS];
 
+// Default model for translation
+export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS.FLASH_2_5;
+
 // All available models for fallback (in priority order)
 export const ALL_AVAILABLE_MODELS = [
-  GEMINI_MODELS.FLASH_1_5, // Try 1.5 Flash first (most likely to have quota)
-  GEMINI_MODELS.PRO_1_5, // Then try 1.5 Pro
-  GEMINI_MODELS.FLASH_2_EXP, // Finally try 2.0 Flash Experimental
+  GEMINI_MODELS.FLASH_2_5, // Try 2.5 Flash first (default, fast and balanced)
+  GEMINI_MODELS.FLASH_LITE_2_5, // Then try 2.5 Flash Lite (fastest, lightest)
+  GEMINI_MODELS.PRO_2_5, // Finally try 2.5 Pro (most accurate for complex tasks)
 ] as const;
 
 // Input Sanitization

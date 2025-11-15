@@ -13,6 +13,7 @@ import {
   ALL_AVAILABLE_MODELS,
   OVERALL_TIMEOUT_MS,
   GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL,
   RETRY_BUFFER_TIME_MS,
   type GeminiModelName,
 } from "../constants";
@@ -273,7 +274,7 @@ async function translateWithModelInternal(
 export async function translateToJapanese(
   text: string,
   apiKey: string,
-  modelName: GeminiModelName = GEMINI_MODELS.FLASH_2_EXP,
+  modelName: GeminiModelName = DEFAULT_GEMINI_MODEL,
 ): Promise<string> {
   // Sanitize input text
   const sanitizedText = sanitizeInput(text);
