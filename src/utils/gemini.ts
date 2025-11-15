@@ -299,9 +299,11 @@ export async function translateToJapanese(
     }
 
     try {
-      // Calculate timeout for this attempt (use remaining time, but cap at API_TIMEOUT_MS)
+      // Calculate timeout for this attempt
+      // Ensure timeout is always positive: max(1s, min(remaining - buffer, API_TIMEOUT_MS))
       const remainingTime = getRemainingTimeout();
-      const attemptTimeout = Math.min(remainingTime - RETRY_BUFFER_TIME_MS, API_TIMEOUT_MS);
+      const timeoutWithBuffer = remainingTime - RETRY_BUFFER_TIME_MS;
+      const attemptTimeout = Math.max(1000, Math.min(timeoutWithBuffer, API_TIMEOUT_MS));
 
       // Call API with calculated timeout (internal timeout handler, no external race)
       const result = await translateWithModelInternal(sanitizedText, apiKey, modelName, attemptTimeout);
@@ -365,9 +367,11 @@ export async function translateToJapanese(
       }
 
       try {
-        // Calculate timeout for this attempt (use remaining time, but cap at API_TIMEOUT_MS)
+        // Calculate timeout for this attempt
+        // Ensure timeout is always positive: max(1s, min(remaining - buffer, API_TIMEOUT_MS))
         const remainingTime = getRemainingTimeout();
-        const attemptTimeout = Math.min(remainingTime - RETRY_BUFFER_TIME_MS, API_TIMEOUT_MS);
+        const timeoutWithBuffer = remainingTime - RETRY_BUFFER_TIME_MS;
+        const attemptTimeout = Math.max(1000, Math.min(timeoutWithBuffer, API_TIMEOUT_MS));
 
         // Call API with calculated timeout (internal timeout handler, no external race)
         const result = await translateWithModelInternal(sanitizedText, apiKey, fallbackModel, attemptTimeout);
