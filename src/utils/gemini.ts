@@ -107,17 +107,20 @@ function isQuotaError(error: Error): boolean {
  *
  * @remarks
  * Looks for patterns like "Please retry in 8.490937993s" or "retryDelay":"8s"
+ * Uses Math.ceil to round up, ensuring we wait at least as long as the API suggests
  */
 function parseRetryDelay(errorMessage: string): number | null {
   // Pattern 1: "Please retry in 8.490937993s"
   const retryMatch = errorMessage.match(/retry in ([\d.]+)s/i);
   if (retryMatch) {
+    // Round up to ensure we wait at least as long as the API suggests
     return Math.ceil(parseFloat(retryMatch[1]) * 1000);
   }
 
   // Pattern 2: "retryDelay":"8s" or "retryDelay":"8.5s"
   const jsonMatch = errorMessage.match(/"retryDelay"\s*:\s*"([\d.]+)s"/i);
   if (jsonMatch) {
+    // Round up to ensure we wait at least as long as the API suggests
     return Math.ceil(parseFloat(jsonMatch[1]) * 1000);
   }
 
@@ -150,7 +153,7 @@ function sleep(ms: number): Promise<void> {
 async function translateWithModelInternal(
   sanitizedText: string,
   apiKey: string,
-  modelName: string,
+  modelName: GeminiModelName,
 ): Promise<string> {
   // Create timeout with cleanup capability
   const timeoutHandler = createTimeoutPromise(API_TIMEOUT_MS);
@@ -267,9 +270,14 @@ export async function translateToJapanese(
   // Track overall timeout to prevent excessive waiting
   const overallStartTime = Date.now();
 
+  // Helper function to get remaining time until overall timeout
+  const getRemainingTimeout = (): number => {
+    return OVERALL_TIMEOUT_MS - (Date.now() - overallStartTime);
+  };
+
   // Helper function to check if overall timeout exceeded
   const checkOverallTimeout = () => {
-    if (Date.now() - overallStartTime > OVERALL_TIMEOUT_MS) {
+    if (getRemainingTimeout() <= 0) {
       throw new Error(ERROR_MESSAGES.OVERALL_TIMEOUT(OVERALL_TIMEOUT_MS / 1000));
     }
   };
@@ -281,8 +289,26 @@ export async function translateToJapanese(
     // Check overall timeout before each attempt
     checkOverallTimeout();
 
+    // Log retry attempt for debugging
+    if (attempt > 0) {
+      console.log(`[Gemini] Retry attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS} for model ${modelName}`);
+    }
+
     try {
-      const result = await translateWithModelInternal(sanitizedText, apiKey, modelName);
+      // Create a timeout promise based on remaining time
+      const remainingTime = getRemainingTimeout();
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(ERROR_MESSAGES.OVERALL_TIMEOUT(OVERALL_TIMEOUT_MS / 1000)));
+        }, remainingTime);
+      });
+
+      // Race between API call and remaining timeout
+      const result = await Promise.race([
+        translateWithModelInternal(sanitizedText, apiKey, modelName),
+        timeoutPromise,
+      ]);
+
       return result;
     } catch (error) {
       // Only handle Error instances
@@ -301,10 +327,19 @@ export async function translateToJapanese(
 
         // Parse retry delay from error message, or use exponential backoff
         const suggestedDelay = parseRetryDelay(error.message);
-        const retryDelay = suggestedDelay || INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+        const baseDelay = suggestedDelay || INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
 
-        // Wait before retrying (capped at MAX_RETRY_DELAY_MS)
-        await sleep(Math.min(retryDelay, MAX_RETRY_DELAY_MS));
+        // Calculate remaining time and adjust delay accordingly
+        const remainingTime = getRemainingTimeout();
+        const bufferTime = 1000; // Reserve 1s buffer for next attempt
+        const maxAllowedDelay = Math.max(0, remainingTime - bufferTime);
+
+        // Use the minimum of: base delay, MAX_RETRY_DELAY_MS, and remaining time
+        const actualDelay = Math.min(baseDelay, MAX_RETRY_DELAY_MS, maxAllowedDelay);
+
+        if (actualDelay > 0) {
+          await sleep(actualDelay);
+        }
         continue;
       }
 
@@ -320,6 +355,7 @@ export async function translateToJapanese(
 
     // Guard against empty fallback list
     if (fallbackModels.length === 0) {
+      // This should never happen unless ALL_AVAILABLE_MODELS only contains one model
       throw new Error(ERROR_MESSAGES.QUOTA_EXCEEDED(modelName, true));
     }
 
@@ -327,9 +363,26 @@ export async function translateToJapanese(
       // Check overall timeout before trying fallback model
       checkOverallTimeout();
 
+      // Log fallback attempt for debugging
+      console.log(`[Gemini] Trying fallback model: ${fallbackModel} (primary model ${modelName} exhausted quota)`);
+
       try {
-        const result = await translateWithModelInternal(sanitizedText, apiKey, fallbackModel);
-        // Success with fallback model
+        // Create a timeout promise based on remaining time
+        const remainingTime = getRemainingTimeout();
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(ERROR_MESSAGES.OVERALL_TIMEOUT(OVERALL_TIMEOUT_MS / 1000)));
+          }, remainingTime);
+        });
+
+        // Race between API call and remaining timeout
+        const result = await Promise.race([
+          translateWithModelInternal(sanitizedText, apiKey, fallbackModel),
+          timeoutPromise,
+        ]);
+
+        // Success with fallback model - log for debugging
+        console.log(`[Gemini] Translation succeeded with fallback model: ${fallbackModel}`);
         return result;
       } catch (error) {
         // Only handle Error instances
