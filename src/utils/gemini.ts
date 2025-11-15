@@ -13,6 +13,7 @@ import {
   ALL_AVAILABLE_MODELS,
   OVERALL_TIMEOUT_MS,
   GEMINI_MODELS,
+  RETRY_BUFFER_TIME_MS,
   type GeminiModelName,
 } from "../constants";
 
@@ -143,20 +144,23 @@ function sleep(ms: number): Promise<void> {
  * @param sanitizedText - Pre-sanitized text to translate
  * @param apiKey - Google Gemini API key
  * @param modelName - The Gemini model to use
+ * @param timeoutMs - Timeout in milliseconds (defaults to API_TIMEOUT_MS)
  * @returns Translated text in Japanese
  * @throws Error if API call fails or times out
  *
  * @remarks
  * This is an internal function used by translateToJapanese.
  * It does not implement retry logic or model fallback.
+ * The timeout parameter allows the caller to specify a custom timeout based on remaining overall time.
  */
 async function translateWithModelInternal(
   sanitizedText: string,
   apiKey: string,
   modelName: GeminiModelName,
+  timeoutMs: number = API_TIMEOUT_MS,
 ): Promise<string> {
-  // Create timeout with cleanup capability
-  const timeoutHandler = createTimeoutPromise(API_TIMEOUT_MS);
+  // Create timeout with cleanup capability using provided timeout
+  const timeoutHandler = createTimeoutPromise(timeoutMs);
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -294,23 +298,15 @@ export async function translateToJapanese(
       console.log(`[Gemini] Retry attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS} for model ${modelName}`);
     }
 
-    // Create timeout handler based on remaining time
-    const remainingTime = getRemainingTimeout();
-    const overallTimeoutHandler = createTimeoutPromise(remainingTime);
-
     try {
-      // Race between API call and remaining timeout
-      const result = await Promise.race([
-        translateWithModelInternal(sanitizedText, apiKey, modelName),
-        overallTimeoutHandler.promise,
-      ]);
+      // Calculate timeout for this attempt (use remaining time, but cap at API_TIMEOUT_MS)
+      const remainingTime = getRemainingTimeout();
+      const attemptTimeout = Math.min(remainingTime - RETRY_BUFFER_TIME_MS, API_TIMEOUT_MS);
 
-      // Clean up timeout on success
-      overallTimeoutHandler.cancel();
+      // Call API with calculated timeout (internal timeout handler, no external race)
+      const result = await translateWithModelInternal(sanitizedText, apiKey, modelName, attemptTimeout);
       return result;
     } catch (error) {
-      // Always clean up timeout on error
-      overallTimeoutHandler.cancel();
 
       // Only handle Error instances
       if (!(error instanceof Error)) {
@@ -332,8 +328,7 @@ export async function translateToJapanese(
 
         // Calculate remaining time and adjust delay accordingly
         const remainingTime = getRemainingTimeout();
-        const bufferTime = 1000; // Reserve 1s buffer for next attempt
-        const maxAllowedDelay = Math.max(0, remainingTime - bufferTime);
+        const maxAllowedDelay = Math.max(0, remainingTime - RETRY_BUFFER_TIME_MS);
 
         // Use the minimum of: base delay, MAX_RETRY_DELAY_MS, and remaining time
         const actualDelay = Math.min(baseDelay, MAX_RETRY_DELAY_MS, maxAllowedDelay);
@@ -369,19 +364,13 @@ export async function translateToJapanese(
         console.log(`[Gemini] Trying fallback model: ${fallbackModel} (primary model ${modelName} exhausted quota)`);
       }
 
-      // Create timeout handler based on remaining time
-      const remainingTime = getRemainingTimeout();
-      const overallTimeoutHandler = createTimeoutPromise(remainingTime);
-
       try {
-        // Race between API call and remaining timeout
-        const result = await Promise.race([
-          translateWithModelInternal(sanitizedText, apiKey, fallbackModel),
-          overallTimeoutHandler.promise,
-        ]);
+        // Calculate timeout for this attempt (use remaining time, but cap at API_TIMEOUT_MS)
+        const remainingTime = getRemainingTimeout();
+        const attemptTimeout = Math.min(remainingTime - RETRY_BUFFER_TIME_MS, API_TIMEOUT_MS);
 
-        // Clean up timeout on success
-        overallTimeoutHandler.cancel();
+        // Call API with calculated timeout (internal timeout handler, no external race)
+        const result = await translateWithModelInternal(sanitizedText, apiKey, fallbackModel, attemptTimeout);
 
         // Success with fallback model - log for debugging (development only)
         if (process.env.NODE_ENV === "development") {
@@ -389,8 +378,6 @@ export async function translateToJapanese(
         }
         return result;
       } catch (error) {
-        // Always clean up timeout on error
-        overallTimeoutHandler.cancel();
 
         // Only handle Error instances
         if (!(error instanceof Error)) {

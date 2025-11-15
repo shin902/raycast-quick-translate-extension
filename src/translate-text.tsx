@@ -63,9 +63,26 @@ export default function TranslateText() {
 
         // Validate and normalize model name
         const validModels = Object.values(GEMINI_MODELS);
-        const normalizedModel: GeminiModelName = validModels.includes(geminiModel as GeminiModelName)
-          ? (geminiModel as GeminiModelName)
-          : GEMINI_MODELS.FLASH_2_EXP; // Fallback to default if invalid
+        let normalizedModel: GeminiModelName;
+
+        if (validModels.includes(geminiModel as GeminiModelName)) {
+          normalizedModel = geminiModel as GeminiModelName;
+        } else {
+          // Invalid model in preferences - log warning and fallback to default
+          if (process.env.NODE_ENV === "development") {
+            console.warn(
+              `[QuickTranslate] Invalid model '${geminiModel}' in preferences, falling back to ${GEMINI_MODELS.FLASH_2_EXP}`,
+            );
+          }
+          normalizedModel = GEMINI_MODELS.FLASH_2_EXP;
+
+          // Show brief toast to inform user about fallback
+          await showToast({
+            style: Toast.Style.Warning,
+            title: "Model Fallback",
+            message: `Invalid model in preferences, using ${GEMINI_MODELS.FLASH_2_EXP}`,
+          });
+        }
 
         // Validate API key format
         if (!geminiApiKey || !isValidApiKeyFormat(geminiApiKey)) {
