@@ -289,28 +289,29 @@ export async function translateToJapanese(
     // Check overall timeout before each attempt
     checkOverallTimeout();
 
-    // Log retry attempt for debugging
-    if (attempt > 0) {
+    // Log retry attempt for debugging (development only)
+    if (attempt > 0 && process.env.NODE_ENV === "development") {
       console.log(`[Gemini] Retry attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS} for model ${modelName}`);
     }
 
-    try {
-      // Create a timeout promise based on remaining time
-      const remainingTime = getRemainingTimeout();
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(ERROR_MESSAGES.OVERALL_TIMEOUT(OVERALL_TIMEOUT_MS / 1000)));
-        }, remainingTime);
-      });
+    // Create timeout handler based on remaining time
+    const remainingTime = getRemainingTimeout();
+    const overallTimeoutHandler = createTimeoutPromise(remainingTime);
 
+    try {
       // Race between API call and remaining timeout
       const result = await Promise.race([
         translateWithModelInternal(sanitizedText, apiKey, modelName),
-        timeoutPromise,
+        overallTimeoutHandler.promise,
       ]);
 
+      // Clean up timeout on success
+      overallTimeoutHandler.cancel();
       return result;
     } catch (error) {
+      // Always clean up timeout on error
+      overallTimeoutHandler.cancel();
+
       // Only handle Error instances
       if (!(error instanceof Error)) {
         throw error;
@@ -363,28 +364,34 @@ export async function translateToJapanese(
       // Check overall timeout before trying fallback model
       checkOverallTimeout();
 
-      // Log fallback attempt for debugging
-      console.log(`[Gemini] Trying fallback model: ${fallbackModel} (primary model ${modelName} exhausted quota)`);
+      // Log fallback attempt for debugging (development only)
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[Gemini] Trying fallback model: ${fallbackModel} (primary model ${modelName} exhausted quota)`);
+      }
+
+      // Create timeout handler based on remaining time
+      const remainingTime = getRemainingTimeout();
+      const overallTimeoutHandler = createTimeoutPromise(remainingTime);
 
       try {
-        // Create a timeout promise based on remaining time
-        const remainingTime = getRemainingTimeout();
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(new Error(ERROR_MESSAGES.OVERALL_TIMEOUT(OVERALL_TIMEOUT_MS / 1000)));
-          }, remainingTime);
-        });
-
         // Race between API call and remaining timeout
         const result = await Promise.race([
           translateWithModelInternal(sanitizedText, apiKey, fallbackModel),
-          timeoutPromise,
+          overallTimeoutHandler.promise,
         ]);
 
-        // Success with fallback model - log for debugging
-        console.log(`[Gemini] Translation succeeded with fallback model: ${fallbackModel}`);
+        // Clean up timeout on success
+        overallTimeoutHandler.cancel();
+
+        // Success with fallback model - log for debugging (development only)
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[Gemini] Translation succeeded with fallback model: ${fallbackModel}`);
+        }
         return result;
       } catch (error) {
+        // Always clean up timeout on error
+        overallTimeoutHandler.cancel();
+
         // Only handle Error instances
         if (!(error instanceof Error)) {
           throw error;

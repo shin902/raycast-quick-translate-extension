@@ -9,10 +9,12 @@ export const MAX_TEXT_LENGTH = 10000; // Maximum text length based on Gemini API
 // Reference: https://ai.google.dev/gemini-api/docs/models/gemini#model-variations
 
 // Retry Configuration
-export const MAX_RETRY_ATTEMPTS = 2; // Maximum number of retry attempts for quota errors (reduced for better UX)
+export const MAX_RETRY_ATTEMPTS = 2; // Number of attempts: 1 initial + 1 retry = 2 total attempts
 export const INITIAL_RETRY_DELAY_MS = 2000; // 2s: Gemini API typical recovery time
 export const MAX_RETRY_DELAY_MS = 10000; // 10s: Balance between UX and API recovery
 export const OVERALL_TIMEOUT_MS = 60000; // 60s: Maximum total time for all retry/fallback attempts
+// Worst case: 2 attempts (initial + 1 retry) + 2 fallback models = 4 API calls max
+// Worst case time: ~60s (enforced by OVERALL_TIMEOUT_MS)
 
 // Gemini Models Configuration
 export const GEMINI_MODELS = {

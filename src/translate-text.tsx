@@ -10,7 +10,7 @@ import {
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { translateToJapanese, isValidApiKeyFormat } from "./utils/gemini";
-import { MAX_TEXT_LENGTH, ERROR_MESSAGES } from "./constants";
+import { MAX_TEXT_LENGTH, ERROR_MESSAGES, GEMINI_MODELS, type GeminiModelName } from "./constants";
 
 /**
  * User preferences interface for the extension
@@ -61,6 +61,12 @@ export default function TranslateText() {
         const preferences = getPreferenceValues<Preferences>();
         const { geminiApiKey, geminiModel } = preferences;
 
+        // Validate and normalize model name
+        const validModels = Object.values(GEMINI_MODELS);
+        const normalizedModel: GeminiModelName = validModels.includes(geminiModel as GeminiModelName)
+          ? (geminiModel as GeminiModelName)
+          : GEMINI_MODELS.FLASH_2_EXP; // Fallback to default if invalid
+
         // Validate API key format
         if (!geminiApiKey || !isValidApiKeyFormat(geminiApiKey)) {
           throw new Error(ERROR_MESSAGES.API_KEY_INVALID_FORMAT);
@@ -108,12 +114,12 @@ export default function TranslateText() {
           style: Toast.Style.Animated,
           title: "Translating...",
           message: usedClipboard
-            ? `Using clipboard (${geminiModel}, auto-retry enabled)`
-            : `Using ${geminiModel} (auto-retry enabled)`,
+            ? `Using clipboard (${normalizedModel}, auto-retry enabled)`
+            : `Using ${normalizedModel} (auto-retry enabled)`,
         });
 
         // Translate the text
-        const translated = await translateToJapanese(textToTranslate, geminiApiKey, geminiModel);
+        const translated = await translateToJapanese(textToTranslate, geminiApiKey, normalizedModel);
 
         // Only update state if component is still mounted
         if (!isCancelled) {
