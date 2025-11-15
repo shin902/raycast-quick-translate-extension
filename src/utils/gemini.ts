@@ -82,7 +82,7 @@ function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: ()
  *
  * @param text - The text to translate (max 10,000 characters)
  * @param apiKey - Google Gemini API key (must start with "AIza")
- * @param modelName - The Gemini model to use (default: gemini-2.0-flash-exp)
+ * @param modelName - The Gemini model to use (default: gemini-2.5-flash)
  * @returns Translated text in Japanese
  * @throws Error if text is empty, too long, API call fails, or times out
  *
@@ -107,7 +107,7 @@ function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: ()
 export async function translateToJapanese(
   text: string,
   apiKey: string,
-  modelName: string = "gemini-2.0-flash-exp",
+  modelName: string = "gemini-2.5-flash",
 ): Promise<string> {
   // Sanitize input text
   const sanitizedText = sanitizeInput(text);

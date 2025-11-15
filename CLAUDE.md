@@ -9,7 +9,7 @@ Raycastで選択したテキストを日本語に翻訳するRaycast拡張機能
 - **Raycast API**: macOS用ランチャーの拡張機能API
 - **TypeScript**: 型安全な開発
 - **React**: UI構築
-- **Google Gemini API**: テキスト翻訳に使用（gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash）
+- **Google Gemini API**: テキスト翻訳に使用（gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite）
 - **Tesseract.js**: スクリーンショット翻訳用OCRライブラリ（ローカル処理、無料）※Phase 2で実装予定
 
 ## 主な機能
@@ -26,9 +26,9 @@ Raycastで選択したテキストを日本語に翻訳するRaycast拡張機能
 2. **Geminiモデル選択機能**
    - UIから使用するGeminiモデルを選択可能
    - 対応モデル：
-     - **Gemini 2.0 Flash (Experimental)** - デフォルト、最新・最速
-     - **Gemini 1.5 Pro** - 高精度・複雑なタスク向け
-     - **Gemini 1.5 Flash** - 高速・効率的
+     - **Gemini 2.5 Pro** - 高精度・複雑なタスク向け
+     - **Gemini 2.5 Flash** - デフォルト、高速でバランスが良い
+     - **Gemini 2.5 Flash Lite** - 最軽量・最速
 
 3. **包括的なエラーハンドリング**
    - API Key検証（"AI"プレフィックス必須）
@@ -162,7 +162,7 @@ import { translateToJapanese } from "./utils/gemini";
 const translatedText = await translateToJapanese(
   "Hello world",
   apiKey,
-  "gemini-2.0-flash-exp"
+  "gemini-2.5-flash"
 );
 
 // エラーハンドリング付き
@@ -180,9 +180,9 @@ UIから以下のモデルを選択可能：
 
 ```typescript
 // 利用可能なモデル:
-// - gemini-2.0-flash-exp  (デフォルト) - 最新の実験的モデル、高速
-// - gemini-1.5-pro        - 高精度、複雑なタスク向け
-// - gemini-1.5-flash      - バランス型、高速かつ正確
+// - gemini-2.5-pro        - 高精度、複雑なタスク向け
+// - gemini-2.5-flash      (デフォルト) - 高速でバランスが良い
+// - gemini-2.5-flash-lite - 最軽量・最速
 
 // Preferencesから選択したモデルを取得
 const preferences = getPreferenceValues<Preferences>();
