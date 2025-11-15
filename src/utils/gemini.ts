@@ -88,16 +88,7 @@ function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: ()
 
 /**
  * Check if an error is a quota exceeded error
- * @param text - The text to translate (max 10,000 characters)
- * @param apiKey - Google Gemini API key (must start with "AIza")
- * @param modelName - The Gemini model to use (default: gemini-2.5-flash)
- * @returns Translated text in Japanese
- * @throws Error if text is empty, too long, API call fails, or times out
  *
- * @remarks
- * - API calls timeout after 30 seconds
- * - Input is sanitized to remove problematic characters
- * - Prompt injection is mitigated by clear text delimiters
  * @param error - The error to check
  * @returns true if the error is a quota error, false otherwise
  */
@@ -120,18 +111,6 @@ function isQuotaError(error: Error): boolean {
  * Looks for patterns like "Please retry in 8.490937993s" or "retryDelay":"8s"
  * Uses Math.ceil to round up, ensuring we wait at least as long as the API suggests
  */
-
-export async function translateToJapanese(
-  text: string,
-  apiKey: string,
-  modelName: string = "gemini-2.5-flash",
-): Promise<string> {
-  // Sanitize input text
-  const sanitizedText = sanitizeInput(text);
-
-  // Validate input text
-  if (!sanitizedText || sanitizedText.length === 0) {
-    throw new Error(ERROR_MESSAGES.EMPTY_TEXT);
 function parseRetryDelay(errorMessage: string): number | null {
   // Pattern 1: "Please retry in 8.490937993s"
   const retryMatch = errorMessage.match(/retry in ([\d.]+)s/i);
