@@ -302,11 +302,6 @@ ${translatedText}
             content={translatedText}
             shortcut={{ modifiers: ["cmd"], key: "c" }}
           />
-          <Action.CopyToClipboard
-            title="Copy Both (original + Translation)"
-            content={`Original:\n${originalText}\n\nTranslation:\n${translatedText}`}
-            shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-          />
           <Action.Paste
             title="Paste Translation"
             content={translatedText}
