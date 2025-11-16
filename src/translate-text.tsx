@@ -71,16 +71,16 @@ export default function TranslateText() {
           // Invalid model in preferences - log warning and fallback to default
           if (process.env.NODE_ENV === "development") {
             console.warn(
-              `[QuickTranslate] Invalid model '${geminiModel}' in preferences, falling back to ${GEMINI_MODELS.FLASH_2_EXP}`,
+              `[QuickTranslate] Invalid model '${geminiModel}' in preferences, falling back to ${GEMINI_MODELS.FLASH_2_5}`,
             );
           }
-          normalizedModel = GEMINI_MODELS.FLASH_2_EXP;
+          normalizedModel = GEMINI_MODELS.FLASH_2_5;
 
           // Show brief toast to inform user about fallback
           await showToast({
             style: Toast.Style.Warning,
             title: "Model Fallback",
-            message: `Invalid model in preferences, using ${GEMINI_MODELS.FLASH_2_EXP}`,
+            message: `Invalid model in preferences, using ${GEMINI_MODELS.FLASH_2_5}`,
           });
         }
 
