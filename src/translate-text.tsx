@@ -10,12 +10,14 @@ import {
   LaunchProps,
 } from "@raycast/api";
 import { useEffect, useState, useRef } from "react";
-import { translateToJapanese, isValidApiKeyFormat } from "./utils/gemini";
+import { translateToJapanese, isValidApiKeyFormat, isQuotaError } from "./utils/gemini";
 import {
   MAX_TEXT_LENGTH,
   ERROR_MESSAGES,
   GEMINI_MODELS,
+  VALID_GEMINI_MODELS,
   isValidGeminiModel,
+  getModelDisplayName,
   type GeminiModelName,
 } from "./constants";
 
@@ -226,7 +228,8 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
   }, [currentModel]);
 
   if (error) {
-    const isQuotaError = error.includes("quota") || error.includes("RESOURCE_EXHAUSTED") || error.includes("429");
+    const errorObject = new Error(error);
+    const isQuotaErrorDetected = isQuotaError(errorObject);
 
     return (
       <Detail
@@ -241,7 +244,7 @@ ${error}
    - Get your API key from: https://makersuite.google.com/app/apikey
    - Set it in Raycast preferences for this extension
 
-2. **Quota/Rate Limit Issues** ${isQuotaError ? "⚠️ *Detected*" : ""}
+2. **Quota/Rate Limit Issues** ${isQuotaErrorDetected ? "⚠️ *Detected*" : ""}
    - The extension automatically retries with exponential backoff
    - It will also try alternative models (Gemini 1.5 Flash, 1.5 Pro) if quota is exceeded
    - If all models fail, try again in a few minutes
@@ -260,7 +263,7 @@ ${error}
           <ActionPanel>
             <Action.OpenInBrowser title="Get Gemini Api Key" url="https://makersuite.google.com/app/apikey" />
             <Action.Open title="Open Raycast Preferences" target="raycast://extensions/preferences" />
-            {isQuotaError && (
+            {isQuotaErrorDetected && (
               <>
                 <Action.OpenInBrowser
                   title="Check API Quota"
@@ -283,20 +286,6 @@ ${error}
   if (isLoading) {
     return <Detail isLoading={true} markdown="# Translating...\n\nPlease wait while we translate your text." />;
   }
-
-  // Get model display name for UI
-  const getModelDisplayName = (model: GeminiModelName) => {
-    switch (model) {
-      case GEMINI_MODELS.PRO_2_5:
-        return "Gemini 2.5 Pro";
-      case GEMINI_MODELS.FLASH_2_5:
-        return "Gemini 2.5 Flash";
-      case GEMINI_MODELS.FLASH_LITE_2_5:
-        return "Gemini 2.5 Flash Lite";
-      default:
-        return model;
-    }
-  };
 
   const markdown = `# 翻訳結果
 
@@ -328,30 +317,17 @@ ${translatedText}
             icon="🔄"
             shortcut={{ modifiers: ["cmd"], key: "m" }}
           >
-            <Action
-              title={`${getModelDisplayName(GEMINI_MODELS.FLASH_2_5)}${currentModel === GEMINI_MODELS.FLASH_2_5 ? " (Current)" : ""}`}
-              onAction={() => {
-                if (currentModel !== GEMINI_MODELS.FLASH_2_5) {
-                  setCurrentModel(GEMINI_MODELS.FLASH_2_5);
-                }
-              }}
-            />
-            <Action
-              title={`${getModelDisplayName(GEMINI_MODELS.PRO_2_5)}${currentModel === GEMINI_MODELS.PRO_2_5 ? " (Current)" : ""}`}
-              onAction={() => {
-                if (currentModel !== GEMINI_MODELS.PRO_2_5) {
-                  setCurrentModel(GEMINI_MODELS.PRO_2_5);
-                }
-              }}
-            />
-            <Action
-              title={`${getModelDisplayName(GEMINI_MODELS.FLASH_LITE_2_5)}${currentModel === GEMINI_MODELS.FLASH_LITE_2_5 ? " (Current)" : ""}`}
-              onAction={() => {
-                if (currentModel !== GEMINI_MODELS.FLASH_LITE_2_5) {
-                  setCurrentModel(GEMINI_MODELS.FLASH_LITE_2_5);
-                }
-              }}
-            />
+            {VALID_GEMINI_MODELS.map((model) => (
+              <Action
+                key={model}
+                title={`${getModelDisplayName(model)}${currentModel === model ? " (Current)" : ""}`}
+                onAction={() => {
+                  if (currentModel !== model) {
+                    setCurrentModel(model);
+                  }
+                }}
+              />
+            ))}
           </ActionPanel.Submenu>
         </ActionPanel>
       }

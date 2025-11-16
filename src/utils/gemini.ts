@@ -88,12 +88,23 @@ function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: ()
 }
 
 /**
- * Check if an error is a quota exceeded error
+ * Check if an error is a quota-related error
  *
  * @param error - The error to check
  * @returns true if the error is a quota error, false otherwise
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await translateToJapanese(text, apiKey, model);
+ * } catch (error) {
+ *   if (error instanceof Error && isQuotaError(error)) {
+ *     console.log("Quota exceeded - please try again later");
+ *   }
+ * }
+ * ```
  */
-function isQuotaError(error: Error): boolean {
+export function isQuotaError(error: Error): boolean {
   return (
     error.message.includes("quota") ||
     error.message.includes("RESOURCE_EXHAUSTED") ||
