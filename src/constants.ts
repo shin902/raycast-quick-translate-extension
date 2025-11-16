@@ -53,6 +53,30 @@ export function isValidGeminiModel(model: string): model is GeminiModelName {
   return VALID_GEMINI_MODELS.includes(model as GeminiModelName);
 }
 
+/**
+ * Display names for Gemini models (for UI)
+ */
+export const MODEL_DISPLAY_NAMES: Record<GeminiModelName, string> = {
+  [GEMINI_MODELS.PRO_2_5]: "Gemini 2.5 Pro",
+  [GEMINI_MODELS.FLASH_2_5]: "Gemini 2.5 Flash",
+  [GEMINI_MODELS.FLASH_LITE_2_5]: "Gemini 2.5 Flash Lite",
+} as const;
+
+/**
+ * Get human-readable display name for a Gemini model
+ *
+ * @param model - The model name
+ * @returns The display name for the model
+ *
+ * @example
+ * ```typescript
+ * getModelDisplayName(GEMINI_MODELS.FLASH_2_5); // "Gemini 2.5 Flash"
+ * ```
+ */
+export function getModelDisplayName(model: GeminiModelName): string {
+  return MODEL_DISPLAY_NAMES[model] || model;
+}
+
 // Default model for translation
 export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS.FLASH_2_5;
 

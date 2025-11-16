@@ -10,12 +10,14 @@ import {
   LaunchProps,
 } from "@raycast/api";
 import { useEffect, useState, useRef } from "react";
-import { translateToJapanese, isValidApiKeyFormat } from "./utils/gemini";
+import { translateToJapanese, isValidApiKeyFormat, isQuotaError } from "./utils/gemini";
 import {
   MAX_TEXT_LENGTH,
   ERROR_MESSAGES,
   GEMINI_MODELS,
+  VALID_GEMINI_MODELS,
   isValidGeminiModel,
+  getModelDisplayName,
   type GeminiModelName,
 } from "./constants";
 
@@ -52,7 +54,9 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
   const [originalText, setOriginalText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [currentModel, setCurrentModel] = useState<GeminiModelName | null>(null);
   const isCancelledRef = useRef(false);
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
     // Reset cancelled flag on mount
@@ -65,7 +69,7 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
      * 1. Get preferences (API key, model)
      * 2. Get model from arguments (if provided) or fallback to preferences
      * 3. Validate API key format
-     * 4. Get text from selection (or fallback to clipboard)
+     * 4. Get text from selection (or fallback to clipboard) - only on initial mount
      * 5. Call translation API
      * 6. Display results or errors
      */
@@ -80,32 +84,45 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
         const preferences = getPreferenceValues<Preferences>();
         const { geminiApiKey, geminiModel } = preferences;
 
-        // Get model from arguments (if provided), otherwise use preference
-        const modelFromArgs = props.arguments?.model;
-        const selectedModel = modelFromArgs || geminiModel;
-
-        // Validate and normalize model name using type guard
+        // Determine which model to use
         let normalizedModel: GeminiModelName;
 
-        if (isValidGeminiModel(selectedModel)) {
-          normalizedModel = selectedModel;
-        } else {
-          // Invalid model - log warning and fallback to default
-          if (process.env.NODE_ENV === "development") {
-            console.warn(
-              `[QuickTranslate] Invalid model '${selectedModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
-              "\nValid models:",
-              VALID_GEMINI_MODELS,
-            );
-          }
-          normalizedModel = GEMINI_MODELS.FLASH_2_5;
+        if (isInitialMount.current) {
+          // First mount: Get model from arguments or preferences
+          const modelFromArgs = props.arguments?.model;
+          const selectedModel = modelFromArgs || geminiModel;
 
-          // Show brief toast to inform user about fallback
-          await showToast({
-            style: Toast.Style.Warning,
-            title: "Model Fallback",
-            message: `Invalid model selected, using ${GEMINI_MODELS.FLASH_2_5}`,
-          });
+          // Validate and normalize model name
+          if (isValidGeminiModel(selectedModel)) {
+            normalizedModel = selectedModel;
+          } else {
+            // Invalid model - log warning and fallback to default
+            if (process.env.NODE_ENV === "development") {
+              console.warn(
+                `[QuickTranslate] Invalid model '${selectedModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
+                "\nValid models:",
+                VALID_GEMINI_MODELS,
+              );
+            }
+            normalizedModel = GEMINI_MODELS.FLASH_2_5;
+
+            // Show brief toast to inform user about fallback
+            await showToast({
+              style: Toast.Style.Warning,
+              title: "Model Fallback",
+              message: `Invalid model selected, using ${GEMINI_MODELS.FLASH_2_5}`,
+            });
+          }
+
+          // Set the current model for future re-translations
+          setCurrentModel(normalizedModel);
+          isInitialMount.current = false;
+        } else {
+          // Re-translation: Use the currentModel state
+          if (!currentModel) {
+            throw new Error("Model not initialized");
+          }
+          normalizedModel = currentModel;
         }
 
         // Validate API key format
@@ -113,44 +130,46 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
           throw new Error(ERROR_MESSAGES.API_KEY_INVALID_FORMAT);
         }
 
-        // Get text to translate
+        // Get text to translate (only on initial mount, otherwise use stored originalText)
         let textToTranslate = "";
         let usedClipboard = false;
 
-        try {
-          // Try to get selected text first
-          textToTranslate = await getSelectedText();
-        } catch {
-          // If no text is selected, try clipboard
+        if (isInitialMount.current || !originalText) {
           try {
-            const clipboardText = await Clipboard.readText();
-            if (clipboardText && clipboardText.trim().length > 0) {
-              textToTranslate = clipboardText;
-              usedClipboard = true;
-            }
+            // Try to get selected text first
+            textToTranslate = await getSelectedText();
           } catch {
-            // Clipboard also failed
+            // If no text is selected, try clipboard
+            try {
+              const clipboardText = await Clipboard.readText();
+              if (clipboardText && clipboardText.trim().length > 0) {
+                textToTranslate = clipboardText;
+                usedClipboard = true;
+              }
+            } catch {
+              // Clipboard also failed
+            }
           }
+
+          if (!textToTranslate || textToTranslate.trim().length === 0) {
+            throw new Error(ERROR_MESSAGES.NO_TEXT_TO_TRANSLATE);
+          }
+
+          // Pre-check text length to provide early feedback (UI-level check)
+          const trimmedText = textToTranslate.trim();
+          if (trimmedText.length > MAX_TEXT_LENGTH) {
+            throw new Error(ERROR_MESSAGES.TEXT_TOO_LONG(trimmedText.length));
+          }
+
+          if (!isCancelledRef.current) {
+            setOriginalText(textToTranslate);
+          }
+        } else {
+          // Re-translation: Use the stored original text
+          textToTranslate = originalText;
         }
 
-        if (!textToTranslate || textToTranslate.trim().length === 0) {
-          throw new Error(ERROR_MESSAGES.NO_TEXT_TO_TRANSLATE);
-        }
-
-        // Pre-check text length to provide early feedback (UI-level check)
-        // Note: This is checked again in translateToJapanese() for safety (API-level check)
-        // - UI check: Provides immediate user feedback before API call
-        // - API check: Ensures safety even if called from other contexts
-        const trimmedText = textToTranslate.trim();
-        if (trimmedText.length > MAX_TEXT_LENGTH) {
-          throw new Error(ERROR_MESSAGES.TEXT_TOO_LONG(trimmedText.length));
-        }
-
-        if (!isCancelledRef.current) {
-          setOriginalText(textToTranslate);
-        }
-
-        // Show translating toast with retry info
+        // Show translating toast
         toast = await showToast({
           style: Toast.Style.Animated,
           title: "Translating...",
@@ -167,7 +186,6 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
           setTranslatedText(translated);
 
           // Update toast to success
-          // When toast has Animated style, it should be in loading state
           if (toast) {
             toast.style = Toast.Style.Success;
             toast.title = "Translation completed!";
@@ -183,7 +201,7 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
           if (toast) {
             toast.style = Toast.Style.Failure;
             toast.title = "Translation failed";
-            toast.message = errorMessage.split("\n")[0]; // First line only for toast
+            toast.message = errorMessage.split("\n")[0];
           } else {
             await showToast({
               style: Toast.Style.Failure,
@@ -205,12 +223,13 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
     return () => {
       isCancelledRef.current = true;
     };
-    // Note: props.arguments is stable in Raycast LaunchProps and doesn't cause re-renders
+    // Re-run translation when currentModel changes (for model switching)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.arguments]);
+  }, [currentModel]);
 
   if (error) {
-    const isQuotaError = error.includes("quota") || error.includes("RESOURCE_EXHAUSTED") || error.includes("429");
+    const errorObject = new Error(error);
+    const isQuotaErrorDetected = isQuotaError(errorObject);
 
     return (
       <Detail
@@ -225,7 +244,7 @@ ${error}
    - Get your API key from: https://makersuite.google.com/app/apikey
    - Set it in Raycast preferences for this extension
 
-2. **Quota/Rate Limit Issues** ${isQuotaError ? "⚠️ *Detected*" : ""}
+2. **Quota/Rate Limit Issues** ${isQuotaErrorDetected ? "⚠️ *Detected*" : ""}
    - The extension automatically retries with exponential backoff
    - It will also try alternative models (Gemini 1.5 Flash, 1.5 Pro) if quota is exceeded
    - If all models fail, try again in a few minutes
@@ -244,7 +263,7 @@ ${error}
           <ActionPanel>
             <Action.OpenInBrowser title="Get Gemini Api Key" url="https://makersuite.google.com/app/apikey" />
             <Action.Open title="Open Raycast Preferences" target="raycast://extensions/preferences" />
-            {isQuotaError && (
+            {isQuotaErrorDetected && (
               <>
                 <Action.OpenInBrowser
                   title="Check API Quota"
@@ -293,6 +312,23 @@ ${translatedText}
             content={translatedText}
             shortcut={{ modifiers: ["cmd"], key: "v" }}
           />
+          <ActionPanel.Submenu
+            title="Switch Model & Re-translate"
+            icon="🔄"
+            shortcut={{ modifiers: ["cmd"], key: "m" }}
+          >
+            {VALID_GEMINI_MODELS.map((model) => (
+              <Action
+                key={model}
+                title={`${getModelDisplayName(model)}${currentModel === model ? " (Current)" : ""}`}
+                onAction={() => {
+                  if (currentModel !== model) {
+                    setCurrentModel(model);
+                  }
+                }}
+              />
+            ))}
+          </ActionPanel.Submenu>
         </ActionPanel>
       }
       metadata={
@@ -300,6 +336,7 @@ ${translatedText}
           <Detail.Metadata.Label title="Original Length" text={`${originalText.length} characters`} />
           <Detail.Metadata.Label title="Translation Length" text={`${translatedText.length} characters`} />
           <Detail.Metadata.Separator />
+          <Detail.Metadata.Label title="Model" text={currentModel ? getModelDisplayName(currentModel) : "Unknown"} />
           <Detail.Metadata.Label title="Status" text="✅ Completed" />
         </Detail.Metadata>
       }
