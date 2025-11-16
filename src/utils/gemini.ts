@@ -15,6 +15,7 @@ import {
   GEMINI_MODELS,
   DEFAULT_GEMINI_MODEL,
   RETRY_BUFFER_TIME_MS,
+  MIN_ATTEMPT_TIMEOUT_MS,
   type GeminiModelName,
 } from "../constants";
 
@@ -301,10 +302,10 @@ export async function translateToJapanese(
 
     try {
       // Calculate timeout for this attempt
-      // Ensure timeout is always positive: max(1s, min(remaining - buffer, API_TIMEOUT_MS))
+      // Ensure timeout is always positive: max(MIN_ATTEMPT_TIMEOUT_MS, min(remaining - buffer, API_TIMEOUT_MS))
       const remainingTime = getRemainingTimeout();
       const timeoutWithBuffer = remainingTime - RETRY_BUFFER_TIME_MS;
-      const attemptTimeout = Math.max(1000, Math.min(timeoutWithBuffer, API_TIMEOUT_MS));
+      const attemptTimeout = Math.max(MIN_ATTEMPT_TIMEOUT_MS, Math.min(timeoutWithBuffer, API_TIMEOUT_MS));
 
       // Call API with calculated timeout (internal timeout handler, no external race)
       const result = await translateWithModelInternal(sanitizedText, apiKey, modelName, attemptTimeout);
@@ -369,10 +370,10 @@ export async function translateToJapanese(
 
       try {
         // Calculate timeout for this attempt
-        // Ensure timeout is always positive: max(1s, min(remaining - buffer, API_TIMEOUT_MS))
+        // Ensure timeout is always positive: max(MIN_ATTEMPT_TIMEOUT_MS, min(remaining - buffer, API_TIMEOUT_MS))
         const remainingTime = getRemainingTimeout();
         const timeoutWithBuffer = remainingTime - RETRY_BUFFER_TIME_MS;
-        const attemptTimeout = Math.max(1000, Math.min(timeoutWithBuffer, API_TIMEOUT_MS));
+        const attemptTimeout = Math.max(MIN_ATTEMPT_TIMEOUT_MS, Math.min(timeoutWithBuffer, API_TIMEOUT_MS));
 
         // Call API with calculated timeout (internal timeout handler, no external race)
         const result = await translateWithModelInternal(sanitizedText, apiKey, fallbackModel, attemptTimeout);

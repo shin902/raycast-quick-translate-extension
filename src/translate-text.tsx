@@ -15,7 +15,7 @@ import {
   MAX_TEXT_LENGTH,
   ERROR_MESSAGES,
   GEMINI_MODELS,
-  VALID_GEMINI_MODELS,
+  isValidGeminiModel,
   type GeminiModelName,
 } from "./constants";
 
@@ -84,10 +84,10 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
         const modelFromArgs = props.arguments?.model;
         const selectedModel = modelFromArgs || geminiModel;
 
-        // Validate and normalize model name
+        // Validate and normalize model name using type guard
         let normalizedModel: GeminiModelName;
 
-        if (VALID_GEMINI_MODELS.includes(selectedModel)) {
+        if (isValidGeminiModel(selectedModel)) {
           normalizedModel = selectedModel;
         } else {
           // Invalid model - log warning and fallback to default
@@ -205,6 +205,8 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
     return () => {
       isCancelledRef.current = true;
     };
+    // Note: props.arguments is stable in Raycast LaunchProps and doesn't cause re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.arguments]);
 
   if (error) {

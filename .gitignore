@@ -28,3 +28,8 @@ npm-debug.log*
 # Temporary files
 *.tmp
 .cache/
+
+# Test coverage
+coverage/
+*.lcov
+.nyc_output/

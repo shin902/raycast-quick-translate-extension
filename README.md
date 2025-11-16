@@ -6,7 +6,7 @@ Translate selected text to Japanese using Google Gemini API.
 
 - 🚀 Quick translation of selected text to Japanese
 - 📋 Fallback to clipboard if no text is selected
-- 🤖 Powered by Google Gemini API (gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash)
+- 🤖 Powered by Google Gemini API (gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite)
 - 📝 Copy translation with keyboard shortcuts
 - ✨ Clean and intuitive UI with detailed results
 
@@ -100,9 +100,9 @@ The extension also handles:
 
 You can choose which Gemini model to use in the extension preferences:
 
-- **Gemini 2.0 Flash (Experimental)** - Latest and fastest model (default)
-- **Gemini 1.5 Pro** - High accuracy and complex tasks
-- **Gemini 1.5 Flash** - Fast and efficient
+- **Gemini 2.5 Flash** - Balanced speed and accuracy (default)
+- **Gemini 2.5 Pro** - High accuracy for complex tasks
+- **Gemini 2.5 Flash Lite** - Fastest and most lightweight
 
 ## Development
 
@@ -134,6 +134,15 @@ npm run lint
 
 # Fix linting issues
 npm run fix-lint
+
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
 
 # Publish to Raycast Store
 npm run publish
@@ -173,7 +182,7 @@ If the extension can't access selected text:
 If translations timeout (after 30 seconds):
 1. Try shorter text (under 5,000 characters recommended)
 2. Check your network connection speed
-3. Switch to a faster model (gemini-2.0-flash-exp)
+3. Switch to a faster model (gemini-2.5-flash-lite)
 
 ## API Costs & Quotas
 
