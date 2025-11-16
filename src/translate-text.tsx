@@ -7,17 +7,31 @@ import {
   Action,
   showToast,
   Toast,
+  LaunchProps,
 } from "@raycast/api";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { translateToJapanese, isValidApiKeyFormat } from "./utils/gemini";
-import { MAX_TEXT_LENGTH, ERROR_MESSAGES, GEMINI_MODELS, type GeminiModelName } from "./constants";
+import {
+  MAX_TEXT_LENGTH,
+  ERROR_MESSAGES,
+  GEMINI_MODELS,
+  VALID_GEMINI_MODELS,
+  type GeminiModelName,
+} from "./constants";
 
 /**
  * User preferences interface for the extension
  */
 interface Preferences {
   geminiApiKey: string;
-  geminiModel: string;
+  geminiModel: GeminiModelName;
+}
+
+/**
+ * Command arguments interface
+ */
+interface Arguments {
+  model?: GeminiModelName;
 }
 
 /**
@@ -30,28 +44,33 @@ interface Preferences {
  * - Displaying results with copy/paste actions
  * - Comprehensive error handling with user-friendly messages
  *
+ * @param props - Launch props containing command arguments
  * @returns React component that displays translation results or errors
  */
-export default function TranslateText() {
+export default function TranslateText(props: LaunchProps<{ arguments: Arguments }>) {
   const [isLoading, setIsLoading] = useState(true);
   const [originalText, setOriginalText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const isCancelledRef = useRef(false);
 
   useEffect(() => {
+    // Reset cancelled flag on mount
+    isCancelledRef.current = false;
+
     /**
      * Main translation logic
      *
      * Flow:
      * 1. Get preferences (API key, model)
-     * 2. Validate API key format
-     * 3. Get text from selection (or fallback to clipboard)
-     * 4. Call translation API
-     * 5. Display results or errors
+     * 2. Get model from arguments (if provided) or fallback to preferences
+     * 3. Validate API key format
+     * 4. Get text from selection (or fallback to clipboard)
+     * 5. Call translation API
+     * 6. Display results or errors
      */
     async function translate() {
       let toast: Toast | undefined;
-      let isCancelled = false; // Flag to prevent state updates after unmount
 
       try {
         setIsLoading(true);
@@ -61,17 +80,22 @@ export default function TranslateText() {
         const preferences = getPreferenceValues<Preferences>();
         const { geminiApiKey, geminiModel } = preferences;
 
+        // Get model from arguments (if provided), otherwise use preference
+        const modelFromArgs = props.arguments?.model;
+        const selectedModel = modelFromArgs || geminiModel;
+
         // Validate and normalize model name
-        const validModels = Object.values(GEMINI_MODELS);
         let normalizedModel: GeminiModelName;
 
-        if (validModels.includes(geminiModel as GeminiModelName)) {
-          normalizedModel = geminiModel as GeminiModelName;
+        if (VALID_GEMINI_MODELS.includes(selectedModel)) {
+          normalizedModel = selectedModel;
         } else {
-          // Invalid model in preferences - log warning and fallback to default
+          // Invalid model - log warning and fallback to default
           if (process.env.NODE_ENV === "development") {
             console.warn(
-              `[QuickTranslate] Invalid model '${geminiModel}' in preferences, falling back to ${GEMINI_MODELS.FLASH_2_5}`,
+              `[QuickTranslate] Invalid model '${selectedModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
+              "\nValid models:",
+              VALID_GEMINI_MODELS,
             );
           }
           normalizedModel = GEMINI_MODELS.FLASH_2_5;
@@ -80,7 +104,7 @@ export default function TranslateText() {
           await showToast({
             style: Toast.Style.Warning,
             title: "Model Fallback",
-            message: `Invalid model in preferences, using ${GEMINI_MODELS.FLASH_2_5}`,
+            message: `Invalid model selected, using ${GEMINI_MODELS.FLASH_2_5}`,
           });
         }
 
@@ -122,7 +146,7 @@ export default function TranslateText() {
           throw new Error(ERROR_MESSAGES.TEXT_TOO_LONG(trimmedText.length));
         }
 
-        if (!isCancelled) {
+        if (!isCancelledRef.current) {
           setOriginalText(textToTranslate);
         }
 
@@ -139,7 +163,7 @@ export default function TranslateText() {
         const translated = await translateToJapanese(textToTranslate, geminiApiKey, normalizedModel);
 
         // Only update state if component is still mounted
-        if (!isCancelled) {
+        if (!isCancelledRef.current) {
           setTranslatedText(translated);
 
           // Update toast to success
@@ -151,7 +175,7 @@ export default function TranslateText() {
           }
         }
       } catch (err) {
-        if (!isCancelled) {
+        if (!isCancelledRef.current) {
           const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
           setError(errorMessage);
 
@@ -169,28 +193,19 @@ export default function TranslateText() {
           }
         }
       } finally {
-        if (!isCancelled) {
+        if (!isCancelledRef.current) {
           setIsLoading(false);
         }
       }
-
-      // Return cleanup function
-      return () => {
-        isCancelled = true;
-      };
     }
 
-    const cleanup = translate();
+    translate();
 
     // Cleanup on unmount
     return () => {
-      if (cleanup) {
-        cleanup.then((cleanupFn) => {
-          if (cleanupFn) cleanupFn();
-        });
-      }
+      isCancelledRef.current = true;
     };
-  }, []);
+  }, [props.arguments]);
 
   if (error) {
     const isQuotaError = error.includes("quota") || error.includes("RESOURCE_EXHAUSTED") || error.includes("429");

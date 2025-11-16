@@ -30,6 +30,9 @@ export const GEMINI_MODELS = {
 // Type for Gemini model names (for better type safety)
 export type GeminiModelName = (typeof GEMINI_MODELS)[keyof typeof GEMINI_MODELS];
 
+// Valid Gemini models (pre-computed for performance)
+export const VALID_GEMINI_MODELS = Object.values(GEMINI_MODELS) as readonly GeminiModelName[];
+
 // Default model for translation
 export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS.FLASH_2_5;
 
@@ -72,7 +75,7 @@ export const ERROR_MESSAGES = {
     const baseMessage = `API quota exceeded for model: ${modelName}`;
     const fallbackMessage = triedFallback
       ? "\n\nAll alternative models also exceeded quota. Please try again later."
-      : "\n\nTip: Try switching to a different model in preferences (Gemini 1.5 Flash or 1.5 Pro may have available quota).";
+      : "\n\nTip: Try switching to a different model in preferences (Gemini 2.5 Flash Lite or Gemini 2.5 Pro may have available quota).";
     return `${baseMessage}${fallbackMessage}\n\nCheck your quota at: https://console.cloud.google.com/\nLearn about rate limits: https://ai.google.dev/gemini-api/docs/rate-limits`;
   },
   OVERALL_TIMEOUT: (seconds: number) =>
