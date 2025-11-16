@@ -14,6 +14,7 @@ export const INITIAL_RETRY_DELAY_MS = 2000; // 2s: Gemini API typical recovery t
 export const MAX_RETRY_DELAY_MS = 10000; // 10s: Balance between UX and API recovery
 export const OVERALL_TIMEOUT_MS = 60000; // 60s: Maximum total time for all retry/fallback attempts
 export const RETRY_BUFFER_TIME_MS = 1000; // 1s: Buffer time reserved before timeout for retry attempts
+export const MIN_ATTEMPT_TIMEOUT_MS = 1000; // 1s: Minimum timeout for any single API attempt
 // Actual retry behavior with MAX_RETRY_ATTEMPTS = 2:
 // - Attempt 0 (initial): No delay
 // - Attempt 1 (retry): 2s delay (2000ms * 2^1 = 4000ms, capped at 2s in practice)
@@ -32,6 +33,25 @@ export type GeminiModelName = (typeof GEMINI_MODELS)[keyof typeof GEMINI_MODELS]
 
 // Valid Gemini models (pre-computed for performance)
 export const VALID_GEMINI_MODELS = Object.values(GEMINI_MODELS) as readonly GeminiModelName[];
+
+/**
+ * Type guard to check if a string is a valid Gemini model name
+ *
+ * @param model - The model name to check
+ * @returns true if the model is a valid GeminiModelName, false otherwise
+ *
+ * @example
+ * ```typescript
+ * const model = "gemini-2.5-flash";
+ * if (isValidGeminiModel(model)) {
+ *   // model is typed as GeminiModelName here
+ *   const result = await translateToJapanese(text, apiKey, model);
+ * }
+ * ```
+ */
+export function isValidGeminiModel(model: string): model is GeminiModelName {
+  return VALID_GEMINI_MODELS.includes(model as GeminiModelName);
+}
 
 // Default model for translation
 export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS.FLASH_2_5;
