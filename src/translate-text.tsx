@@ -251,17 +251,9 @@ ${error}
     return <Detail isLoading={true} markdown="# Translating...\n\nPlease wait while we translate your text." />;
   }
 
-  const markdown = `# 翻訳結果 / Translation Result
-
-## 日本語 (Japanese)
+  const markdown = `# 翻訳結果
 
 ${translatedText}
-
----
-
-## 原文 (Original)
-
-${originalText}
 `;
 
   return (
