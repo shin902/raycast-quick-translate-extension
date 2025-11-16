@@ -9,23 +9,29 @@ import {
   Toast,
   LaunchProps,
 } from "@raycast/api";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { translateToJapanese, isValidApiKeyFormat } from "./utils/gemini";
-import { MAX_TEXT_LENGTH, ERROR_MESSAGES, GEMINI_MODELS, type GeminiModelName } from "./constants";
+import {
+  MAX_TEXT_LENGTH,
+  ERROR_MESSAGES,
+  GEMINI_MODELS,
+  VALID_GEMINI_MODELS,
+  type GeminiModelName,
+} from "./constants";
 
 /**
  * User preferences interface for the extension
  */
 interface Preferences {
   geminiApiKey: string;
-  geminiModel: string;
+  geminiModel: GeminiModelName;
 }
 
 /**
  * Command arguments interface
  */
 interface Arguments {
-  model?: string;
+  model?: GeminiModelName;
 }
 
 /**
@@ -46,8 +52,12 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
   const [originalText, setOriginalText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const isCancelledRef = useRef(false);
 
   useEffect(() => {
+    // Reset cancelled flag on mount
+    isCancelledRef.current = false;
+
     /**
      * Main translation logic
      *
@@ -61,7 +71,6 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
      */
     async function translate() {
       let toast: Toast | undefined;
-      let isCancelled = false; // Flag to prevent state updates after unmount
 
       try {
         setIsLoading(true);
@@ -76,16 +85,17 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
         const selectedModel = modelFromArgs || geminiModel;
 
         // Validate and normalize model name
-        const validModels = Object.values(GEMINI_MODELS);
         let normalizedModel: GeminiModelName;
 
-        if (validModels.includes(selectedModel as GeminiModelName)) {
-          normalizedModel = selectedModel as GeminiModelName;
+        if (VALID_GEMINI_MODELS.includes(selectedModel)) {
+          normalizedModel = selectedModel;
         } else {
           // Invalid model - log warning and fallback to default
           if (process.env.NODE_ENV === "development") {
             console.warn(
               `[QuickTranslate] Invalid model '${selectedModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
+              "\nValid models:",
+              VALID_GEMINI_MODELS,
             );
           }
           normalizedModel = GEMINI_MODELS.FLASH_2_5;
@@ -136,7 +146,7 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
           throw new Error(ERROR_MESSAGES.TEXT_TOO_LONG(trimmedText.length));
         }
 
-        if (!isCancelled) {
+        if (!isCancelledRef.current) {
           setOriginalText(textToTranslate);
         }
 
@@ -153,7 +163,7 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
         const translated = await translateToJapanese(textToTranslate, geminiApiKey, normalizedModel);
 
         // Only update state if component is still mounted
-        if (!isCancelled) {
+        if (!isCancelledRef.current) {
           setTranslatedText(translated);
 
           // Update toast to success
@@ -165,7 +175,7 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
           }
         }
       } catch (err) {
-        if (!isCancelled) {
+        if (!isCancelledRef.current) {
           const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
           setError(errorMessage);
 
@@ -183,28 +193,19 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
           }
         }
       } finally {
-        if (!isCancelled) {
+        if (!isCancelledRef.current) {
           setIsLoading(false);
         }
       }
-
-      // Return cleanup function
-      return () => {
-        isCancelled = true;
-      };
     }
 
-    const cleanup = translate();
+    translate();
 
     // Cleanup on unmount
     return () => {
-      if (cleanup) {
-        cleanup.then((cleanupFn) => {
-          if (cleanupFn) cleanupFn();
-        });
-      }
+      isCancelledRef.current = true;
     };
-  }, []);
+  }, [props.arguments]);
 
   if (error) {
     const isQuotaError = error.includes("quota") || error.includes("RESOURCE_EXHAUSTED") || error.includes("429");
