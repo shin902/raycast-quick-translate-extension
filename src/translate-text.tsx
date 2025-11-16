@@ -7,6 +7,7 @@ import {
   Action,
   showToast,
   Toast,
+  LaunchProps,
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { translateToJapanese, isValidApiKeyFormat } from "./utils/gemini";
@@ -21,6 +22,13 @@ interface Preferences {
 }
 
 /**
+ * Command arguments interface
+ */
+interface Arguments {
+  model?: string;
+}
+
+/**
  * Main component for translating selected text to Japanese using Gemini API
  *
  * This component handles:
@@ -30,9 +38,10 @@ interface Preferences {
  * - Displaying results with copy/paste actions
  * - Comprehensive error handling with user-friendly messages
  *
+ * @param props - Launch props containing command arguments
  * @returns React component that displays translation results or errors
  */
-export default function TranslateText() {
+export default function TranslateText(props: LaunchProps<{ arguments: Arguments }>) {
   const [isLoading, setIsLoading] = useState(true);
   const [originalText, setOriginalText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
@@ -44,10 +53,11 @@ export default function TranslateText() {
      *
      * Flow:
      * 1. Get preferences (API key, model)
-     * 2. Validate API key format
-     * 3. Get text from selection (or fallback to clipboard)
-     * 4. Call translation API
-     * 5. Display results or errors
+     * 2. Get model from arguments (if provided) or fallback to preferences
+     * 3. Validate API key format
+     * 4. Get text from selection (or fallback to clipboard)
+     * 5. Call translation API
+     * 6. Display results or errors
      */
     async function translate() {
       let toast: Toast | undefined;
@@ -61,17 +71,21 @@ export default function TranslateText() {
         const preferences = getPreferenceValues<Preferences>();
         const { geminiApiKey, geminiModel } = preferences;
 
+        // Get model from arguments (if provided), otherwise use preference
+        const modelFromArgs = props.arguments?.model;
+        const selectedModel = modelFromArgs || geminiModel;
+
         // Validate and normalize model name
         const validModels = Object.values(GEMINI_MODELS);
         let normalizedModel: GeminiModelName;
 
-        if (validModels.includes(geminiModel as GeminiModelName)) {
-          normalizedModel = geminiModel as GeminiModelName;
+        if (validModels.includes(selectedModel as GeminiModelName)) {
+          normalizedModel = selectedModel as GeminiModelName;
         } else {
-          // Invalid model in preferences - log warning and fallback to default
+          // Invalid model - log warning and fallback to default
           if (process.env.NODE_ENV === "development") {
             console.warn(
-              `[QuickTranslate] Invalid model '${geminiModel}' in preferences, falling back to ${GEMINI_MODELS.FLASH_2_5}`,
+              `[QuickTranslate] Invalid model '${selectedModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
             );
           }
           normalizedModel = GEMINI_MODELS.FLASH_2_5;
@@ -80,7 +94,7 @@ export default function TranslateText() {
           await showToast({
             style: Toast.Style.Warning,
             title: "Model Fallback",
-            message: `Invalid model in preferences, using ${GEMINI_MODELS.FLASH_2_5}`,
+            message: `Invalid model selected, using ${GEMINI_MODELS.FLASH_2_5}`,
           });
         }
 
