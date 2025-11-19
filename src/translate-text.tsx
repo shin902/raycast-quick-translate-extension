@@ -108,7 +108,7 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
 
             // Show brief toast to inform user about fallback
             await showToast({
-              style: Toast.Style.Warning,
+              style: Toast.Style.Animated,
               title: "Model Fallback",
               message: `Invalid model selected, using ${GEMINI_MODELS.FLASH_2_5}`,
             });
