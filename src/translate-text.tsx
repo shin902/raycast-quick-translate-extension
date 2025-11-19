@@ -58,7 +58,7 @@ export default function TranslateText() {
      *
      * Flow:
      * 1. Get preferences (API key, model)
-     * 2. Get model from arguments (if provided) or fallback to preferences
+     * 2. Validate and normalize model name
      * 3. Validate API key format
      * 4. Get text from selection (or fallback to clipboard) - only on initial mount
      * 5. Call translation API
@@ -211,7 +211,7 @@ export default function TranslateText() {
     return () => {
       isCancelledRef.current = true;
     };
-    // Re-run translation when currentModel changes (for model switching)
+    // Dependencies: currentModel only (intentionally excludes originalText to prevent re-fetching text)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentModel]);
 
