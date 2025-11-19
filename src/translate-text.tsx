@@ -118,11 +118,11 @@ export default function TranslateText() {
           throw new Error(ERROR_MESSAGES.API_KEY_INVALID_FORMAT);
         }
 
-        // Get text to translate (only on initial mount, otherwise use stored originalText)
+        // Get text to translate (only when no original text stored, otherwise use stored originalText)
         let textToTranslate = "";
         let usedClipboard = false;
 
-        if (isInitialMount.current || !originalText) {
+        if (!originalText) {
           try {
             // Try to get selected text first
             textToTranslate = await getSelectedText();
@@ -234,7 +234,7 @@ ${error}
 
 2. **Quota/Rate Limit Issues** ${isQuotaErrorDetected ? "⚠️ *Detected*" : ""}
    - The extension automatically retries with exponential backoff
-   - It will also try alternative models (Gemini 1.5 Flash, 1.5 Pro) if quota is exceeded
+   - It will also try alternative models (Gemini 2.5 Flash Lite, 2.5 Pro) if quota is exceeded
    - If all models fail, try again in a few minutes
    - Check your quota at: https://console.cloud.google.com/
    - Learn about rate limits: https://ai.google.dev/gemini-api/docs/rate-limits

@@ -74,7 +74,7 @@ export const MODEL_DISPLAY_NAMES: Record<GeminiModelName, string> = {
  * ```
  */
 export function getModelDisplayName(model: GeminiModelName): string {
-  return MODEL_DISPLAY_NAMES[model] || model;
+  return MODEL_DISPLAY_NAMES[model];
 }
 
 // Default model for translation
@@ -96,9 +96,8 @@ export const CONSECUTIVE_SPACES_PATTERN = / {3,}/g; // Matches 3 or more consecu
 // Gemini API keys format: AIza[A-Za-z0-9_-]{35}
 // Example: AIzaSyD1234567890abcdefghijklmnopqrstuvwxyz
 export const API_KEY_PREFIX = "AIza"; // Standard Gemini API key prefix
-export const API_KEY_PATTERN = /^AIza[A-Za-z0-9_-]{35}$/; // Strict pattern for validation
 
-// Fallback pattern for older/different key formats (more flexible)
+// Flexible pattern for various key formats (supports older/different formats)
 export const API_KEY_FLEXIBLE_PATTERN = /^AI[A-Za-z0-9_-]{30,}$/;
 
 // Error Messages
