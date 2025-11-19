@@ -7,7 +7,6 @@ import {
   Action,
   showToast,
   Toast,
-  LaunchProps,
 } from "@raycast/api";
 import { useEffect, useState, useRef } from "react";
 import { translateToJapanese, isValidApiKeyFormat, isQuotaError } from "./utils/gemini";
@@ -30,13 +29,6 @@ interface Preferences {
 }
 
 /**
- * Command arguments interface
- */
-interface Arguments {
-  model?: GeminiModelName;
-}
-
-/**
  * Main component for translating selected text to Japanese using Gemini API
  *
  * This component handles:
@@ -46,10 +38,9 @@ interface Arguments {
  * - Displaying results with copy/paste actions
  * - Comprehensive error handling with user-friendly messages
  *
- * @param props - Launch props containing command arguments
  * @returns React component that displays translation results or errors
  */
-export default function TranslateText(props: LaunchProps<{ arguments: Arguments }>) {
+export default function TranslateText() {
   const [isLoading, setIsLoading] = useState(true);
   const [originalText, setOriginalText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
@@ -88,18 +79,15 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
         let normalizedModel: GeminiModelName;
 
         if (isInitialMount.current) {
-          // First mount: Get model from arguments or preferences
-          const modelFromArgs = props.arguments?.model;
-          const selectedModel = modelFromArgs || geminiModel;
-
+          // First mount: Get model from preferences
           // Validate and normalize model name
-          if (isValidGeminiModel(selectedModel)) {
-            normalizedModel = selectedModel;
+          if (isValidGeminiModel(geminiModel)) {
+            normalizedModel = geminiModel;
           } else {
             // Invalid model - log warning and fallback to default
             if (process.env.NODE_ENV === "development") {
               console.warn(
-                `[QuickTranslate] Invalid model '${selectedModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
+                `[QuickTranslate] Invalid model '${geminiModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
                 "\nValid models:",
                 VALID_GEMINI_MODELS,
               );
