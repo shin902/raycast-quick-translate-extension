@@ -24,9 +24,6 @@ declare namespace Preferences {
 
 declare namespace Arguments {
   /** Arguments passed to the `translate-text` command */
-  export type TranslateText = {
-  /** Choose model (optional) */
-  "model": "gemini-2.5-pro" | "gemini-2.5-flash" | "gemini-2.5-flash-lite"
-}
+  export type TranslateText = {}
 }
 
