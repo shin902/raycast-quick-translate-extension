@@ -7,7 +7,6 @@ import {
   Action,
   showToast,
   Toast,
-  LaunchProps,
 } from "@raycast/api";
 import { useEffect, useState, useRef } from "react";
 import { translateToJapanese, isValidApiKeyFormat, isQuotaError } from "./utils/gemini";
@@ -30,13 +29,6 @@ interface Preferences {
 }
 
 /**
- * Command arguments interface
- */
-interface Arguments {
-  model?: GeminiModelName;
-}
-
-/**
  * Main component for translating selected text to Japanese using Gemini API
  *
  * This component handles:
@@ -46,10 +38,9 @@ interface Arguments {
  * - Displaying results with copy/paste actions
  * - Comprehensive error handling with user-friendly messages
  *
- * @param props - Launch props containing command arguments
  * @returns React component that displays translation results or errors
  */
-export default function TranslateText(props: LaunchProps<{ arguments: Arguments }>) {
+export default function TranslateText() {
   const [isLoading, setIsLoading] = useState(true);
   const [originalText, setOriginalText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
@@ -67,7 +58,7 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
      *
      * Flow:
      * 1. Get preferences (API key, model)
-     * 2. Get model from arguments (if provided) or fallback to preferences
+     * 2. Validate and normalize model name
      * 3. Validate API key format
      * 4. Get text from selection (or fallback to clipboard) - only on initial mount
      * 5. Call translation API
@@ -88,18 +79,15 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
         let normalizedModel: GeminiModelName;
 
         if (isInitialMount.current) {
-          // First mount: Get model from arguments or preferences
-          const modelFromArgs = props.arguments?.model;
-          const selectedModel = modelFromArgs || geminiModel;
-
+          // First mount: Get model from preferences
           // Validate and normalize model name
-          if (isValidGeminiModel(selectedModel)) {
-            normalizedModel = selectedModel;
+          if (isValidGeminiModel(geminiModel)) {
+            normalizedModel = geminiModel;
           } else {
             // Invalid model - log warning and fallback to default
             if (process.env.NODE_ENV === "development") {
               console.warn(
-                `[QuickTranslate] Invalid model '${selectedModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
+                `[QuickTranslate] Invalid model '${geminiModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
                 "\nValid models:",
                 VALID_GEMINI_MODELS,
               );
@@ -130,11 +118,11 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
           throw new Error(ERROR_MESSAGES.API_KEY_INVALID_FORMAT);
         }
 
-        // Get text to translate (only on initial mount, otherwise use stored originalText)
+        // Get text to translate (only when no original text stored, otherwise use stored originalText)
         let textToTranslate = "";
         let usedClipboard = false;
 
-        if (isInitialMount.current || !originalText) {
+        if (!originalText) {
           try {
             // Try to get selected text first
             textToTranslate = await getSelectedText();
@@ -223,7 +211,7 @@ export default function TranslateText(props: LaunchProps<{ arguments: Arguments 
     return () => {
       isCancelledRef.current = true;
     };
-    // Re-run translation when currentModel changes (for model switching)
+    // Dependencies: currentModel only (intentionally excludes originalText to prevent re-fetching text)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentModel]);
 
@@ -246,7 +234,7 @@ ${error}
 
 2. **Quota/Rate Limit Issues** ${isQuotaErrorDetected ? "⚠️ *Detected*" : ""}
    - The extension automatically retries with exponential backoff
-   - It will also try alternative models (Gemini 1.5 Flash, 1.5 Pro) if quota is exceeded
+   - It will also try alternative models (Gemini 2.5 Flash Lite, 2.5 Pro) if quota is exceeded
    - If all models fail, try again in a few minutes
    - Check your quota at: https://console.cloud.google.com/
    - Learn about rate limits: https://ai.google.dev/gemini-api/docs/rate-limits

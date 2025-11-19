@@ -70,7 +70,7 @@ function sanitizeInput(text: string): string {
  * Always call cancel() after the promise settles to prevent memory leaks
  */
 function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: () => void } {
-  let timeoutId: NodeJS.Timeout;
+  let timeoutId: NodeJS.Timeout | undefined;
 
   const promise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
