@@ -275,10 +275,7 @@ ${error}
     return <Detail isLoading={true} markdown="# Translating...\n\nPlease wait while we translate your text." />;
   }
 
-  const markdown = `# 翻訳結果
-
-${translatedText}
-`;
+  const markdown = translatedText;
 
   return (
     <Detail
