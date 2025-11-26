@@ -52,6 +52,9 @@ export default function TranslateText() {
   // Ref to track if the user has explicitly selected a model via the action panel
   const userOverrodeModelRef = useRef(false);
 
+  // Ref to track whether the component has been unmounted/cancelled to avoid state updates
+  const isCancelledRef = useRef(false);
+
   // Initialize currentModel state. If user has overridden, keep their choice.
   // Otherwise, use the preferred model from preferences.
   const [currentModel, setCurrentModel] = useState<GeminiModelName>(() => {
