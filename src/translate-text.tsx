@@ -254,7 +254,7 @@ ${error}
             {isQuotaErrorDetected && (
               <>
                 <Action.OpenInBrowser
-                  title="Check API Quota"
+                  title="Check Api Quota"
                   url="https://console.cloud.google.com/"
                   shortcut={{ modifiers: ["cmd"], key: "q" }}
                 />

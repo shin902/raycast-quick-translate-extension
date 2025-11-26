@@ -12,7 +12,6 @@ import {
   MAX_RETRY_DELAY_MS,
   ALL_AVAILABLE_MODELS,
   OVERALL_TIMEOUT_MS,
-  GEMINI_MODELS,
   DEFAULT_GEMINI_MODEL,
   RETRY_BUFFER_TIME_MS,
   MIN_ATTEMPT_TIMEOUT_MS,
@@ -322,7 +321,6 @@ export async function translateToJapanese(
       const result = await translateWithModelInternal(sanitizedText, apiKey, modelName, attemptTimeout);
       return result;
     } catch (error) {
-
       // Only handle Error instances
       if (!(error instanceof Error)) {
         throw error;
@@ -395,7 +393,6 @@ export async function translateToJapanese(
         }
         return result;
       } catch (error) {
-
         // Only handle Error instances
         if (!(error instanceof Error)) {
           throw error;
