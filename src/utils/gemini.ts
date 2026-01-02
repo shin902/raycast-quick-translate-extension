@@ -4,17 +4,18 @@ import {
   MIN_API_KEY_LENGTH,
   MAX_TEXT_LENGTH,
   CONSECUTIVE_SPACES_PATTERN,
-  API_KEY_FLEXIBLE_PATTERN,
+  GEMINI_API_KEY_FLEXIBLE_PATTERN,
   ERROR_MESSAGES,
   TRANSLATION_PROMPT_TEMPLATE,
   MAX_RETRY_ATTEMPTS,
   INITIAL_RETRY_DELAY_MS,
   MAX_RETRY_DELAY_MS,
-  ALL_AVAILABLE_MODELS,
+  GEMINI_FALLBACK_MODELS,
   OVERALL_TIMEOUT_MS,
   DEFAULT_GEMINI_MODEL,
   RETRY_BUFFER_TIME_MS,
   MIN_ATTEMPT_TIMEOUT_MS,
+  PROVIDERS,
   type GeminiModelName,
 } from "../constants";
 
@@ -290,7 +291,7 @@ export async function translateToJapanese(
 
   // Validate API key
   if (!apiKey || apiKey.trim().length === 0) {
-    throw new Error(ERROR_MESSAGES.API_KEY_REQUIRED);
+    throw new Error(ERROR_MESSAGES.API_KEY_REQUIRED(PROVIDERS.GEMINI));
   }
 
   // Track overall timeout to prevent excessive waiting
@@ -370,7 +371,7 @@ export async function translateToJapanese(
   // If primary model failed with quota error, try fallback models
   if (lastError && isQuotaError(lastError)) {
     // Build dynamic fallback list excluding the primary model
-    const fallbackModels = ALL_AVAILABLE_MODELS.filter((model) => model !== modelName);
+    const fallbackModels = GEMINI_FALLBACK_MODELS.filter((model) => model !== modelName);
 
     // Guard against empty fallback list
     if (fallbackModels.length === 0) {
@@ -468,5 +469,5 @@ export function isValidApiKeyFormat(apiKey: string): boolean {
 
   // Use flexible pattern to accommodate different key formats
   // Matches keys starting with "AI" followed by alphanumeric, underscores, or hyphens
-  return API_KEY_FLEXIBLE_PATTERN.test(trimmedKey);
+  return GEMINI_API_KEY_FLEXIBLE_PATTERN.test(trimmedKey);
 }

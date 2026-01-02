@@ -5,7 +5,9 @@
   "description": "Translate selected text to Japanese using Google Gemini API",
   "icon": "icon.png",
   "author": "shin902",
-  "categories": ["Productivity"],
+  "categories": [
+    "Productivity"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=22.14.0",
@@ -19,9 +21,27 @@
       "mode": "view",
       "preferences": [
         {
+          "name": "provider",
+          "type": "dropdown",
+          "required": false,
+          "title": "Translation Provider",
+          "description": "Select the AI provider to use for translation",
+          "default": "groq",
+          "data": [
+            {
+              "title": "Google Gemini",
+              "value": "gemini"
+            },
+            {
+              "title": "Groq",
+              "value": "groq"
+            }
+          ]
+        },
+        {
           "name": "geminiApiKey",
           "type": "password",
-          "required": true,
+          "required": false,
           "title": "Gemini API Key",
           "description": "Your Google Gemini API key from https://makersuite.google.com/app/apikey"
         },
@@ -46,13 +66,51 @@
               "value": "gemini-2.5-flash-lite"
             }
           ]
+        },
+        {
+          "name": "groqApiKey",
+          "type": "password",
+          "required": false,
+          "title": "Groq API Key",
+          "description": "Your Groq API key from https://console.groq.com/keys"
+        },
+        {
+          "name": "groqModel",
+          "type": "dropdown",
+          "required": false,
+          "title": "Groq Model",
+          "description": "Select the Groq model to use for translation",
+          "default": "openai/gpt-oss-120b",
+          "data": [
+            {
+              "title": "Llama 3.3 70B Versatile",
+              "value": "llama-3.3-70b-versatile"
+            },
+            {
+              "title": "Llama 3.1 70B Versatile",
+              "value": "llama-3.1-70b-versatile"
+            },
+            {
+              "title": "Mixtral 8x7B",
+              "value": "mixtral-8x7b-32768"
+            },
+            {
+              "title": "gpt-oss-120b",
+              "value": "openai/gpt-oss-120b"
+            },
+            {
+              "title": "gpt-oss-20b",
+              "value": "openai/gpt-oss-20b"
+            }
+          ]
         }
       ]
     }
   ],
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "@raycast/api": "^1.83.2",
-    "@google/generative-ai": "^0.21.0"
+    "groq-sdk": "^0.37.0"
   },
   "devDependencies": {
     "@raycast/eslint-config": "^1.0.11",
