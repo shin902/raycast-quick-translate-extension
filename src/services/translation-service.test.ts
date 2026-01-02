@@ -3,12 +3,12 @@
  */
 
 import { translateText } from "./translation-service";
-import { translateToJapanese, isValidApiKeyFormat } from "../utils/gemini";
+import { translateToJapanese, isValidApiKeyFormat } from "../utils/translation-provider";
 import { getTextToTranslate, validateTextLength } from "../utils/text-source";
-import { ERROR_MESSAGES, GEMINI_MODELS } from "../constants";
+import { ERROR_MESSAGES, PROVIDERS, GEMINI_MODELS } from "../constants";
 
 // Mock dependencies
-jest.mock("../utils/gemini");
+jest.mock("../utils/translation-provider");
 jest.mock("../utils/text-source");
 
 const mockTranslateToJapanese = translateToJapanese as jest.MockedFunction<typeof translateToJapanese>;
@@ -18,6 +18,7 @@ const mockValidateTextLength = validateTextLength as jest.MockedFunction<typeof 
 
 describe("translateText", () => {
   const validApiKey = "AIzaSyD1234567890abcdefghijklmnopqrstuvwxyz";
+  const provider = PROVIDERS.GEMINI;
   const model = GEMINI_MODELS.FLASH_LITE_2_5;
 
   beforeEach(() => {
@@ -36,6 +37,7 @@ describe("translateText", () => {
       });
 
       const result = await translateText({
+        provider,
         apiKey: validApiKey,
         model,
       });
@@ -48,7 +50,7 @@ describe("translateText", () => {
 
       expect(mockGetTextToTranslate).toHaveBeenCalledTimes(1);
       expect(mockValidateTextLength).toHaveBeenCalledWith("Hello world");
-      expect(mockTranslateToJapanese).toHaveBeenCalledWith("Hello world", validApiKey, model);
+      expect(mockTranslateToJapanese).toHaveBeenCalledWith("Hello world", validApiKey, provider, model);
     });
 
     it("should translate text from clipboard successfully", async () => {
@@ -58,6 +60,7 @@ describe("translateText", () => {
       });
 
       const result = await translateText({
+        provider,
         apiKey: validApiKey,
         model,
       });
@@ -79,7 +82,8 @@ describe("translateText", () => {
 
       await translateText(
         {
-          apiKey: validApiKey,
+          provider,
+        apiKey: validApiKey,
           model,
         },
         onProgress,
@@ -101,7 +105,8 @@ describe("translateText", () => {
 
       await translateText(
         {
-          apiKey: validApiKey,
+          provider,
+        apiKey: validApiKey,
           model,
         },
         onProgress,
@@ -117,6 +122,7 @@ describe("translateText", () => {
   describe("re-translation", () => {
     it("should re-translate using original text", async () => {
       const result = await translateText({
+        provider,
         apiKey: validApiKey,
         model,
         originalText: "Original text",
@@ -131,7 +137,7 @@ describe("translateText", () => {
       // Should not call getTextToTranslate when originalText is provided
       expect(mockGetTextToTranslate).not.toHaveBeenCalled();
       expect(mockValidateTextLength).toHaveBeenCalledWith("Original text");
-      expect(mockTranslateToJapanese).toHaveBeenCalledWith("Original text", validApiKey, model);
+      expect(mockTranslateToJapanese).toHaveBeenCalledWith("Original text", validApiKey, provider, model);
     });
 
     it("should not call progress callback with clipboard indicator for re-translation", async () => {
@@ -139,7 +145,8 @@ describe("translateText", () => {
 
       await translateText(
         {
-          apiKey: validApiKey,
+          provider,
+        apiKey: validApiKey,
           model,
           originalText: "Original text",
         },
@@ -159,10 +166,11 @@ describe("translateText", () => {
 
       await expect(
         translateText({
+          provider,
           apiKey: "invalid-key",
           model,
         }),
-      ).rejects.toThrow(ERROR_MESSAGES.API_KEY_INVALID_FORMAT);
+      ).rejects.toThrow(ERROR_MESSAGES.API_KEY_INVALID_FORMAT(provider));
     });
 
     it("should throw error for empty API key", async () => {
@@ -170,10 +178,11 @@ describe("translateText", () => {
 
       await expect(
         translateText({
+          provider,
           apiKey: "",
           model,
         }),
-      ).rejects.toThrow(ERROR_MESSAGES.API_KEY_INVALID_FORMAT);
+      ).rejects.toThrow(ERROR_MESSAGES.API_KEY_INVALID_FORMAT(provider));
     });
 
     it("should throw error when text length validation fails", async () => {
@@ -187,7 +196,8 @@ describe("translateText", () => {
 
       await expect(
         translateText({
-          apiKey: validApiKey,
+          provider,
+        apiKey: validApiKey,
           model,
         }),
       ).rejects.toThrow(ERROR_MESSAGES.TEXT_TOO_LONG(10001));
@@ -204,7 +214,8 @@ describe("translateText", () => {
 
       await expect(
         translateText({
-          apiKey: validApiKey,
+          provider,
+        apiKey: validApiKey,
           model,
         }),
       ).rejects.toThrow("API error");
@@ -215,7 +226,8 @@ describe("translateText", () => {
 
       await expect(
         translateText({
-          apiKey: validApiKey,
+          provider,
+        apiKey: validApiKey,
           model,
         }),
       ).rejects.toThrow(ERROR_MESSAGES.NO_TEXT_TO_TRANSLATE);

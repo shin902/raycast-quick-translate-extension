@@ -1,15 +1,17 @@
-import { translateToJapanese, isValidApiKeyFormat } from "../utils/gemini";
+import { translateToJapanese, isValidApiKeyFormat } from "../utils/translation-provider";
 import { getTextToTranslate, validateTextLength } from "../utils/text-source";
-import { ERROR_MESSAGES, type GeminiModelName } from "../constants";
+import { ERROR_MESSAGES, type ProviderName, type ModelName } from "../constants";
 
 /**
  * Options for translation operation
  */
 export interface TranslationOptions {
-  /** Gemini API key */
+  /** Translation provider (Gemini or Groq) */
+  provider: ProviderName;
+  /** API key for the provider */
   apiKey: string;
-  /** Gemini model to use */
-  model: GeminiModelName;
+  /** Model to use */
+  model: ModelName;
   /** Original text to re-translate (optional, for re-translation) */
   originalText?: string;
 }
@@ -71,11 +73,11 @@ export async function translateText(
   options: TranslationOptions,
   onProgress?: TranslationProgressCallback,
 ): Promise<TranslationResult> {
-  const { apiKey, model, originalText } = options;
+  const { provider, apiKey, model, originalText } = options;
 
   // Validate API key format
-  if (!apiKey || !isValidApiKeyFormat(apiKey)) {
-    throw new Error(ERROR_MESSAGES.API_KEY_INVALID_FORMAT);
+  if (!apiKey || !isValidApiKeyFormat(apiKey, provider)) {
+    throw new Error(ERROR_MESSAGES.API_KEY_INVALID_FORMAT(provider));
   }
 
   // Get text to translate
@@ -102,7 +104,7 @@ export async function translateText(
   );
 
   // Translate the text
-  const translatedText = await translateToJapanese(textToTranslate, apiKey, model);
+  const translatedText = await translateToJapanese(textToTranslate, apiKey, provider, model);
 
   return {
     originalText: textToTranslate,
