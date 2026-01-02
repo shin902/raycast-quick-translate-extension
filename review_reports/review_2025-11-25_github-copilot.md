@@ -1,9 +1,10 @@
 ---
 review_id: rev-20251125-001
-date: 2025-11-25
+date: 2025-11-26
 reviewer: "GitHub Copilot"
 scope: "branch: feat/default-flash-lite-model"
 commits_reviewed:
+  - e6ab6f5e6ab6f5: "refactor: Improve robustness, testing, and docs for Gemini 2.5 Flash Lite"
   - 6b3884f65ef24a0c6bb25daafeff5ecba116cbe3: "feat: Set gemini-2.5-flash-lite as default translation mode"
   - c41424dc3184d391120af04614898f73ae9fd4e0: "fix: 不要なモデル選択引数を削除し、引数を簡素化"
   - ad9a9431a729a17253ba4d240e2c9256e3c745f7: "fix: 不要なマークダウンラッパーを削除し、翻訳結果を直接表示"
@@ -18,6 +19,15 @@ recommendation: "Minor changes: tighten validation, add unit tests for retry/fal
 - **対象ブランチ**: `feat/default-flash-lite-model`
 - **レビュー対象**: `src/translate-text.tsx`, `src/utils/gemini.ts`, `src/constants.ts`, テスト: `src/*.test.ts`
 - **結論**: 実装は概ね良好で型安全、入力サニタイズやリトライ／フォールバックの考慮があり堅牢です。とはいえ、いくつかの微修正と追加テストを推奨します。
+
+**Post-review actions**
+
+- 実際にリポジトリ内でビルドとテストを実行しました。
+  - `npm test`: すべてのテストが通過しました（2スイート、42テスト、PASS）。
+  - `npm run build`: TypeScript のエラー（未定義の `isCancelledRef`）を検出し、`src/translate-text.tsx` に `isCancelledRef` を追加して修正しました。
+  - 修正後に再ビルドを行い、ビルドは成功しました。
+
+これらの修正は軽微であり、実稼働への影響は限定的です。追加テストの作成を優先すると良いでしょう。
 
 **主な長所**
 

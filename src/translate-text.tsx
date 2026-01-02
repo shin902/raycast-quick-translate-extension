@@ -1,18 +1,8 @@
-import {
-  Detail,
-  getPreferenceValues,
-  getSelectedText,
-  Clipboard,
-  ActionPanel,
-  Action,
-  showToast,
-  Toast,
-} from "@raycast/api";
+import { Detail, getPreferenceValues, ActionPanel, Action, showToast, Toast } from "@raycast/api";
 import { useEffect, useState, useRef } from "react";
-import { translateToJapanese, isValidApiKeyFormat, isQuotaError } from "./utils/gemini";
+import { isQuotaError } from "./utils/gemini";
+import { translateText } from "./services/translation-service";
 import {
-  MAX_TEXT_LENGTH,
-  ERROR_MESSAGES,
   GEMINI_MODELS,
   VALID_GEMINI_MODELS,
   isValidGeminiModel,
@@ -51,6 +41,9 @@ export default function TranslateText() {
 
   // Ref to track if the user has explicitly selected a model via the action panel
   const userOverrodeModelRef = useRef(false);
+
+  // Ref to track whether the component has been unmounted/cancelled to avoid state updates
+  const isCancelledRef = useRef(false);
 
   // Initialize currentModel state. If user has overridden, keep their choice.
   // Otherwise, use the preferred model from preferences.
@@ -93,69 +86,31 @@ export default function TranslateText() {
         setIsLoading(true);
         setError(null);
 
-        // Determine which model to use. `currentModel` state already holds the active model,
-        // which respects user overrides or the latest preference value.
-        const normalizedModel = currentModel;
-
-        // Validate API key format
-        if (!geminiApiKey || !isValidApiKeyFormat(geminiApiKey)) {
-          throw new Error(ERROR_MESSAGES.API_KEY_INVALID_FORMAT);
-        }
-
-        // Get text to translate (only when no original text stored, otherwise use stored originalText)
-        let textToTranslate = "";
-        let usedClipboard = false;
-
-        if (!originalText) {
-          try {
-            // Try to get selected text first
-            textToTranslate = await getSelectedText();
-          } catch {
-            // If no text is selected, try clipboard
-            try {
-              const clipboardText = await Clipboard.readText();
-              if (clipboardText && clipboardText.trim().length > 0) {
-                textToTranslate = clipboardText;
-                usedClipboard = true;
-              }
-            } catch {
-              // Clipboard also failed
-            }
-          }
-
-          if (!textToTranslate || textToTranslate.trim().length === 0) {
-            throw new Error(ERROR_MESSAGES.NO_TEXT_TO_TRANSLATE);
-          }
-
-          // Pre-check text length to provide early feedback (UI-level check)
-          const trimmedText = textToTranslate.trim();
-          if (trimmedText.length > MAX_TEXT_LENGTH) {
-            throw new Error(ERROR_MESSAGES.TEXT_TOO_LONG(trimmedText.length));
-          }
-
-          if (!isCancelledRef.current) {
-            setOriginalText(textToTranslate);
-          }
-        } else {
-          // Re-translation: Use the stored original text
-          textToTranslate = originalText;
-        }
-
         // Show translating toast
         toast = await showToast({
           style: Toast.Style.Animated,
           title: "Translating...",
-          message: usedClipboard
-            ? `Using clipboard (${normalizedModel}, auto-retry enabled)`
-            : `Using ${normalizedModel} (auto-retry enabled)`,
         });
 
-        // Translate the text
-        const translated = await translateToJapanese(textToTranslate, geminiApiKey, normalizedModel);
+        // Translate the text using translation service
+        const result = await translateText(
+          {
+            apiKey: geminiApiKey,
+            model: currentModel,
+            originalText: originalText || undefined,
+          },
+          (message, fromClipboard) => {
+            // Update toast with progress
+            if (toast) {
+              toast.message = fromClipboard ? `Using clipboard (${message})` : message;
+            }
+          },
+        );
 
         // Only update state if component is still mounted
         if (!isCancelledRef.current) {
-          setTranslatedText(translated);
+          setOriginalText(result.originalText);
+          setTranslatedText(result.translatedText);
 
           // Update toast to success
           if (toast) {
