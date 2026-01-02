@@ -27,8 +27,8 @@ Raycastで選択したテキストを日本語に翻訳するRaycast拡張機能
    - UIから使用するGeminiモデルを選択可能
    - 対応モデル：
      - **Gemini 2.5 Pro** - 高精度・複雑なタスク向け
-     - **Gemini 2.5 Flash** - デフォルト、高速でバランスが良い
-     - **Gemini 2.5 Flash Lite** - 最軽量・最速
+     - **Gemini 2.5 Flash** - 高速でバランスが良い
+     - **Gemini 2.5 Flash Lite** - （デフォルト）最軽量・最速
 
 3. **包括的なエラーハンドリング**
    - API Key検証（"AI"プレフィックス必須）
@@ -181,8 +181,8 @@ UIから以下のモデルを選択可能：
 ```typescript
 // 利用可能なモデル:
 // - gemini-2.5-pro        - 高精度、複雑なタスク向け
-// - gemini-2.5-flash      (デフォルト) - 高速でバランスが良い
-// - gemini-2.5-flash-lite - 最軽量・最速
+// - gemini-2.5-flash      - 高速でバランスが良い
+// - gemini-2.5-flash-lite (デフォルト) - 最軽量・最速
 
 // Preferencesから選択したモデルを取得
 const preferences = getPreferenceValues<Preferences>();

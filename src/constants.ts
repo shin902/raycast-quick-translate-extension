@@ -78,12 +78,12 @@ export function getModelDisplayName(model: GeminiModelName): string {
 }
 
 // Default model for translation
-export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS.FLASH_2_5;
+export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS.FLASH_LITE_2_5;
 
 // All available models for fallback (in priority order)
 export const ALL_AVAILABLE_MODELS = [
-  GEMINI_MODELS.FLASH_2_5, // Try 2.5 Flash first (default, fast and balanced)
-  GEMINI_MODELS.FLASH_LITE_2_5, // Then try 2.5 Flash Lite (fastest, lightest)
+  GEMINI_MODELS.FLASH_LITE_2_5, // Try 2.5 Flash Lite first (default, fastest and lightest)
+  GEMINI_MODELS.FLASH_2_5, // Then try 2.5 Flash (fast and balanced)
   GEMINI_MODELS.PRO_2_5, // Finally try 2.5 Pro (most accurate for complex tasks)
 ] as const;
 
@@ -98,7 +98,7 @@ export const CONSECUTIVE_SPACES_PATTERN = / {3,}/g; // Matches 3 or more consecu
 export const API_KEY_PREFIX = "AIza"; // Standard Gemini API key prefix
 
 // Flexible pattern for various key formats (supports older/different formats)
-export const API_KEY_FLEXIBLE_PATTERN = /^AI[A-Za-z0-9_-]{30,}$/;
+export const API_KEY_FLEXIBLE_PATTERN = /^AI[A-Za-z0-9_-]{28,}$/;
 
 // Error Messages
 export const ERROR_MESSAGES = {

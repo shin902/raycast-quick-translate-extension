@@ -100,9 +100,9 @@ The extension also handles:
 
 You can choose which Gemini model to use in the extension preferences:
 
-- **Gemini 2.5 Flash** - Balanced speed and accuracy (default)
+- **Gemini 2.5 Flash Lite** - Fastest and most lightweight (default)
+- **Gemini 2.5 Flash** - Balanced speed and accuracy
 - **Gemini 2.5 Pro** - High accuracy for complex tasks
-- **Gemini 2.5 Flash Lite** - Fastest and most lightweight
 
 ## Development
 
@@ -204,9 +204,7 @@ For most personal use cases, the free tier is sufficient. See [official pricing]
 - No credit card required for free tier
 
 **Paid tier** (if needed):
-- $0.00025 per 1K characters (Gemini 1.5 Flash)
-- $0.00125 per 1K characters (Gemini 1.5 Pro)
-- See [current pricing](https://ai.google.dev/pricing) for updates
+- See [current pricing](https://ai.google.dev/pricing) for updates on Gemini 2.5 models
 
 ### Monitoring Usage
 

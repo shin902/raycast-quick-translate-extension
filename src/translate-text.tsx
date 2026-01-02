@@ -41,13 +41,35 @@ interface Preferences {
  * @returns React component that displays translation results or errors
  */
 export default function TranslateText() {
+  const preferences = getPreferenceValues<Preferences>();
+  const { geminiApiKey, geminiModel: preferredGeminiModel } = preferences;
+
   const [isLoading, setIsLoading] = useState(true);
   const [originalText, setOriginalText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [currentModel, setCurrentModel] = useState<GeminiModelName | null>(null);
-  const isCancelledRef = useRef(false);
-  const isInitialMount = useRef(true);
+
+  // Ref to track if the user has explicitly selected a model via the action panel
+  const userOverrodeModelRef = useRef(false);
+
+  // Initialize currentModel state. If user has overridden, keep their choice.
+  // Otherwise, use the preferred model from preferences.
+  const [currentModel, setCurrentModel] = useState<GeminiModelName>(() => {
+    // This initializer runs only once on initial render
+    return isValidGeminiModel(preferredGeminiModel) ? preferredGeminiModel : GEMINI_MODELS.FLASH_LITE_2_5;
+  });
+
+  // Effect to update currentModel when preferredGeminiModel changes, but only if user hasn't overridden
+  useEffect(() => {
+    if (!userOverrodeModelRef.current) {
+      const normalizedPreferredModel = isValidGeminiModel(preferredGeminiModel)
+        ? preferredGeminiModel
+        : GEMINI_MODELS.FLASH_LITE_2_5;
+      if (currentModel !== normalizedPreferredModel) {
+        setCurrentModel(normalizedPreferredModel);
+      }
+    }
+  }, [preferredGeminiModel, currentModel]);
 
   useEffect(() => {
     // Reset cancelled flag on mount
@@ -71,47 +93,9 @@ export default function TranslateText() {
         setIsLoading(true);
         setError(null);
 
-        // Get preferences
-        const preferences = getPreferenceValues<Preferences>();
-        const { geminiApiKey, geminiModel } = preferences;
-
-        // Determine which model to use
-        let normalizedModel: GeminiModelName;
-
-        if (isInitialMount.current) {
-          // First mount: Get model from preferences
-          // Validate and normalize model name
-          if (isValidGeminiModel(geminiModel)) {
-            normalizedModel = geminiModel;
-          } else {
-            // Invalid model - log warning and fallback to default
-            if (process.env.NODE_ENV === "development") {
-              console.warn(
-                `[QuickTranslate] Invalid model '${geminiModel}', falling back to ${GEMINI_MODELS.FLASH_2_5}`,
-                "\nValid models:",
-                VALID_GEMINI_MODELS,
-              );
-            }
-            normalizedModel = GEMINI_MODELS.FLASH_2_5;
-
-            // Show brief toast to inform user about fallback
-            await showToast({
-              style: Toast.Style.Animated,
-              title: "Model Fallback",
-              message: `Invalid model selected, using ${GEMINI_MODELS.FLASH_2_5}`,
-            });
-          }
-
-          // Set the current model for future re-translations
-          setCurrentModel(normalizedModel);
-          isInitialMount.current = false;
-        } else {
-          // Re-translation: Use the currentModel state
-          if (!currentModel) {
-            throw new Error("Model not initialized");
-          }
-          normalizedModel = currentModel;
-        }
+        // Determine which model to use. `currentModel` state already holds the active model,
+        // which respects user overrides or the latest preference value.
+        const normalizedModel = currentModel;
 
         // Validate API key format
         if (!geminiApiKey || !isValidApiKeyFormat(geminiApiKey)) {
@@ -211,9 +195,7 @@ export default function TranslateText() {
     return () => {
       isCancelledRef.current = true;
     };
-    // Dependencies: currentModel only (intentionally excludes originalText to prevent re-fetching text)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentModel]);
+  }, [currentModel, geminiApiKey]);
 
   if (error) {
     const errorObject = new Error(error);
@@ -254,7 +236,7 @@ ${error}
             {isQuotaErrorDetected && (
               <>
                 <Action.OpenInBrowser
-                  title="Check API Quota"
+                  title="Check Api Quota"
                   url="https://console.cloud.google.com/"
                   shortcut={{ modifiers: ["cmd"], key: "q" }}
                 />
@@ -303,6 +285,7 @@ ${error}
                 title={`${getModelDisplayName(model)}${currentModel === model ? " (Current)" : ""}`}
                 onAction={() => {
                   if (currentModel !== model) {
+                    userOverrodeModelRef.current = true; // User has now overridden the preference
                     setCurrentModel(model);
                   }
                 }}

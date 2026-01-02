@@ -12,12 +12,21 @@ import {
   MAX_RETRY_DELAY_MS,
   ALL_AVAILABLE_MODELS,
   OVERALL_TIMEOUT_MS,
-  GEMINI_MODELS,
   DEFAULT_GEMINI_MODEL,
   RETRY_BUFFER_TIME_MS,
   MIN_ATTEMPT_TIMEOUT_MS,
   type GeminiModelName,
 } from "../constants";
+
+/**
+ * Custom Error class for translation timeouts
+ */
+export class TranslationTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TranslationTimeoutError";
+  }
+}
 
 /**
  * Sanitize user input text to prevent issues
@@ -36,7 +45,7 @@ import {
  *
  * Performance: Uses pre-compiled regex patterns from constants for efficiency
  */
-function sanitizeInput(text: string): string {
+export function sanitizeInput(text: string): string {
   return (
     text
       .trim()
@@ -74,7 +83,7 @@ function createTimeoutPromise(ms: number): { promise: Promise<never>; cancel: ()
 
   const promise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      reject(new Error(ERROR_MESSAGES.TIMEOUT(ms)));
+      reject(new TranslationTimeoutError(ERROR_MESSAGES.TIMEOUT(ms)));
     }, ms);
   });
 
@@ -209,7 +218,7 @@ async function translateWithModelInternal(
 
     if (error instanceof Error) {
       // Handle timeout errors
-      if (error.message.includes("timed out")) {
+      if (error instanceof TranslationTimeoutError) {
         throw error; // Re-throw timeout error as-is
       }
 
@@ -322,7 +331,6 @@ export async function translateToJapanese(
       const result = await translateWithModelInternal(sanitizedText, apiKey, modelName, attemptTimeout);
       return result;
     } catch (error) {
-
       // Only handle Error instances
       if (!(error instanceof Error)) {
         throw error;
@@ -395,7 +403,6 @@ export async function translateToJapanese(
         }
         return result;
       } catch (error) {
-
         // Only handle Error instances
         if (!(error instanceof Error)) {
           throw error;
