@@ -41,6 +41,8 @@ export const GROQ_MODELS = {
   LLAMA_3_3_70B: "llama-3.3-70b-versatile",
   LLAMA_3_1_70B: "llama-3.1-70b-versatile",
   MIXTRAL_8X7B: "mixtral-8x7b-32768",
+  OSS_120B: "openai/gpt-oss-120b",
+  OSS_20B: "openai/gpt-oss-20b"
 } as const;
 
 // Type for Gemini model names (for better type safety)
@@ -113,6 +115,8 @@ export const GROQ_MODEL_DISPLAY_NAMES: Record<GroqModelName, string> = {
   [GROQ_MODELS.LLAMA_3_3_70B]: "Llama 3.3 70B Versatile",
   [GROQ_MODELS.LLAMA_3_1_70B]: "Llama 3.1 70B Versatile",
   [GROQ_MODELS.MIXTRAL_8X7B]: "Mixtral 8x7B",
+  [GROQ_MODELS.OSS_120B]: "GPT-oss 120B",
+  [GROQ_MODELS.OSS_20B]: "GPT-oss 20B",
 } as const;
 
 /**
@@ -149,7 +153,7 @@ export function getModelDisplayName(model: ModelName, provider: ProviderName): s
 // Default provider and models for translation
 export const DEFAULT_PROVIDER = PROVIDERS.GEMINI;
 export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS.FLASH_LITE_2_5;
-export const DEFAULT_GROQ_MODEL = GROQ_MODELS.LLAMA_3_3_70B;
+export const DEFAULT_GROQ_MODEL = GROQ_MODELS.OSS_120B;
 
 // All available models for fallback (in priority order)
 export const ALL_AVAILABLE_MODELS = [

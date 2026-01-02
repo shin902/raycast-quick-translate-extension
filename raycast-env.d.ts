@@ -24,7 +24,7 @@ declare namespace Preferences {
   /** Groq API Key - Your Groq API key from https://console.groq.com/keys */
   "groqApiKey"?: string,
   /** Groq Model - Select the Groq model to use for translation */
-  "groqModel": "llama-3.3-70b-versatile" | "llama-3.1-70b-versatile" | "mixtral-8x7b-32768"
+  "groqModel": "llama-3.3-70b-versatile" | "llama-3.1-70b-versatile" | "mixtral-8x7b-32768" | "openai/gpt-oss-120b" | "openai/gpt-oss-20b"
 }
 }
 

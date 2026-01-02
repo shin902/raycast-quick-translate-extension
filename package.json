@@ -80,7 +80,7 @@
           "required": false,
           "title": "Groq Model",
           "description": "Select the Groq model to use for translation",
-          "default": "llama-3.3-70b-versatile",
+          "default": "openai/gpt-oss-120b",
           "data": [
             {
               "title": "Llama 3.3 70B Versatile",
@@ -93,6 +93,14 @@
             {
               "title": "Mixtral 8x7B",
               "value": "mixtral-8x7b-32768"
+            },
+            {
+              "title": "gpt-oss-120b",
+              "value": "openai/gpt-oss-120b"
+            },
+            {
+              "title": "gpt-oss-20b",
+              "value": "openai/gpt-oss-20b"
             }
           ]
         }
