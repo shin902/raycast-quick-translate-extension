@@ -1,21 +1,35 @@
 import { Detail, getPreferenceValues, ActionPanel, Action, showToast, Toast } from "@raycast/api";
 import { useEffect, useState, useRef } from "react";
-import { isQuotaError } from "./utils/gemini";
+import { isQuotaError } from "./utils/translation-provider";
 import { translateText } from "./services/translation-service";
 import {
+  PROVIDERS,
   GEMINI_MODELS,
+  GROQ_MODELS,
   VALID_GEMINI_MODELS,
+  VALID_GROQ_MODELS,
   isValidGeminiModel,
+  isValidGroqModel,
+  isValidProvider,
   getModelDisplayName,
+  DEFAULT_PROVIDER,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GROQ_MODEL,
+  type ProviderName,
   type GeminiModelName,
+  type GroqModelName,
+  type ModelName,
 } from "./constants";
 
 /**
  * User preferences interface for the extension
  */
 interface Preferences {
+  provider: ProviderName;
   geminiApiKey: string;
   geminiModel: GeminiModelName;
+  groqApiKey: string;
+  groqModel: GroqModelName;
 }
 
 /**
@@ -32,37 +46,61 @@ interface Preferences {
  */
 export default function TranslateText() {
   const preferences = getPreferenceValues<Preferences>();
-  const { geminiApiKey, geminiModel: preferredGeminiModel } = preferences;
+  const {
+    provider: preferredProvider,
+    geminiApiKey,
+    geminiModel: preferredGeminiModel,
+    groqApiKey,
+    groqModel: preferredGroqModel,
+  } = preferences;
 
   const [isLoading, setIsLoading] = useState(true);
   const [originalText, setOriginalText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Ref to track if the user has explicitly selected a model via the action panel
-  const userOverrodeModelRef = useRef(false);
+  // Ref to track if the user has explicitly overridden provider/model
+  const userOverrodeRef = useRef(false);
 
-  // Ref to track whether the component has been unmounted/cancelled to avoid state updates
+  // Ref to track whether the component has been unmounted/cancelled
   const isCancelledRef = useRef(false);
 
-  // Initialize currentModel state. If user has overridden, keep their choice.
-  // Otherwise, use the preferred model from preferences.
-  const [currentModel, setCurrentModel] = useState<GeminiModelName>(() => {
-    // This initializer runs only once on initial render
-    return isValidGeminiModel(preferredGeminiModel) ? preferredGeminiModel : GEMINI_MODELS.FLASH_LITE_2_5;
+  // Initialize provider state
+  const [currentProvider, setCurrentProvider] = useState<ProviderName>(() => {
+    return isValidProvider(preferredProvider) ? preferredProvider : DEFAULT_PROVIDER;
   });
 
-  // Effect to update currentModel when preferredGeminiModel changes, but only if user hasn't overridden
+  // Initialize model state based on provider
+  const [currentModel, setCurrentModel] = useState<ModelName>(() => {
+    const provider = isValidProvider(preferredProvider) ? preferredProvider : DEFAULT_PROVIDER;
+    if (provider === PROVIDERS.GEMINI) {
+      return isValidGeminiModel(preferredGeminiModel) ? preferredGeminiModel : DEFAULT_GEMINI_MODEL;
+    }
+    return isValidGroqModel(preferredGroqModel) ? preferredGroqModel : DEFAULT_GROQ_MODEL;
+  });
+
+  // Effect to update provider/model when preferences change
   useEffect(() => {
-    if (!userOverrodeModelRef.current) {
-      const normalizedPreferredModel = isValidGeminiModel(preferredGeminiModel)
-        ? preferredGeminiModel
-        : GEMINI_MODELS.FLASH_LITE_2_5;
-      if (currentModel !== normalizedPreferredModel) {
-        setCurrentModel(normalizedPreferredModel);
+    if (!userOverrodeRef.current) {
+      const normalizedProvider = isValidProvider(preferredProvider) ? preferredProvider : DEFAULT_PROVIDER;
+
+      if (currentProvider !== normalizedProvider) {
+        setCurrentProvider(normalizedProvider);
+      }
+
+      // Update model based on provider
+      let normalizedModel: ModelName;
+      if (normalizedProvider === PROVIDERS.GEMINI) {
+        normalizedModel = isValidGeminiModel(preferredGeminiModel) ? preferredGeminiModel : DEFAULT_GEMINI_MODEL;
+      } else {
+        normalizedModel = isValidGroqModel(preferredGroqModel) ? preferredGroqModel : DEFAULT_GROQ_MODEL;
+      }
+
+      if (currentModel !== normalizedModel) {
+        setCurrentModel(normalizedModel);
       }
     }
-  }, [preferredGeminiModel, currentModel]);
+  }, [preferredProvider, preferredGeminiModel, preferredGroqModel, currentProvider, currentModel]);
 
   useEffect(() => {
     // Reset cancelled flag on mount
@@ -92,10 +130,14 @@ export default function TranslateText() {
           title: "Translating...",
         });
 
+        // Get appropriate API key based on provider
+        const apiKey = currentProvider === PROVIDERS.GEMINI ? geminiApiKey : groqApiKey;
+
         // Translate the text using translation service
         const result = await translateText(
           {
-            apiKey: geminiApiKey,
+            provider: currentProvider,
+            apiKey,
             model: currentModel,
             originalText: originalText || undefined,
           },
@@ -150,7 +192,7 @@ export default function TranslateText() {
     return () => {
       isCancelledRef.current = true;
     };
-  }, [currentModel, geminiApiKey]);
+  }, [currentProvider, currentModel, geminiApiKey, groqApiKey]);
 
   if (error) {
     const errorObject = new Error(error);
@@ -230,22 +272,40 @@ ${error}
             shortcut={{ modifiers: ["cmd"], key: "v" }}
           />
           <ActionPanel.Submenu
-            title="Switch Model & Re-translate"
+            title="Switch Provider & Model"
             icon="🔄"
             shortcut={{ modifiers: ["cmd"], key: "m" }}
           >
-            {VALID_GEMINI_MODELS.map((model) => (
-              <Action
-                key={model}
-                title={`${getModelDisplayName(model)}${currentModel === model ? " (Current)" : ""}`}
-                onAction={() => {
-                  if (currentModel !== model) {
-                    userOverrodeModelRef.current = true; // User has now overridden the preference
+            <ActionPanel.Section title="Gemini Models">
+              {VALID_GEMINI_MODELS.map((model) => (
+                <Action
+                  key={model}
+                  title={`${getModelDisplayName(model, PROVIDERS.GEMINI)}${
+                    currentProvider === PROVIDERS.GEMINI && currentModel === model ? " (Current)" : ""
+                  }`}
+                  onAction={() => {
+                    userOverrodeRef.current = true;
+                    setCurrentProvider(PROVIDERS.GEMINI);
                     setCurrentModel(model);
-                  }
-                }}
-              />
-            ))}
+                  }}
+                />
+              ))}
+            </ActionPanel.Section>
+            <ActionPanel.Section title="Groq Models">
+              {VALID_GROQ_MODELS.map((model) => (
+                <Action
+                  key={model}
+                  title={`${getModelDisplayName(model, PROVIDERS.GROQ)}${
+                    currentProvider === PROVIDERS.GROQ && currentModel === model ? " (Current)" : ""
+                  }`}
+                  onAction={() => {
+                    userOverrodeRef.current = true;
+                    setCurrentProvider(PROVIDERS.GROQ);
+                    setCurrentModel(model);
+                  }}
+                />
+              ))}
+            </ActionPanel.Section>
           </ActionPanel.Submenu>
         </ActionPanel>
       }
@@ -254,7 +314,14 @@ ${error}
           <Detail.Metadata.Label title="Original Length" text={`${originalText.length} characters`} />
           <Detail.Metadata.Label title="Translation Length" text={`${translatedText.length} characters`} />
           <Detail.Metadata.Separator />
-          <Detail.Metadata.Label title="Model" text={currentModel ? getModelDisplayName(currentModel) : "Unknown"} />
+          <Detail.Metadata.Label
+            title="Provider"
+            text={currentProvider === PROVIDERS.GEMINI ? "Google Gemini" : "Groq"}
+          />
+          <Detail.Metadata.Label
+            title="Model"
+            text={currentModel ? getModelDisplayName(currentModel, currentProvider) : "Unknown"}
+          />
           <Detail.Metadata.Label title="Status" text="✅ Completed" />
         </Detail.Metadata>
       }
