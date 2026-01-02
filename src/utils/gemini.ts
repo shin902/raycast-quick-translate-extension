@@ -10,7 +10,7 @@ import {
   MAX_RETRY_ATTEMPTS,
   INITIAL_RETRY_DELAY_MS,
   MAX_RETRY_DELAY_MS,
-  ALL_AVAILABLE_MODELS,
+  GEMINI_FALLBACK_MODELS,
   OVERALL_TIMEOUT_MS,
   DEFAULT_GEMINI_MODEL,
   RETRY_BUFFER_TIME_MS,
@@ -371,7 +371,7 @@ export async function translateToJapanese(
   // If primary model failed with quota error, try fallback models
   if (lastError && isQuotaError(lastError)) {
     // Build dynamic fallback list excluding the primary model
-    const fallbackModels = ALL_AVAILABLE_MODELS.filter((model) => model !== modelName);
+    const fallbackModels = GEMINI_FALLBACK_MODELS.filter((model) => model !== modelName);
 
     // Guard against empty fallback list
     if (fallbackModels.length === 0) {

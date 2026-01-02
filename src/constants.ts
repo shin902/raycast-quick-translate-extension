@@ -151,16 +151,29 @@ export function getModelDisplayName(model: ModelName, provider: ProviderName): s
 }
 
 // Default provider and models for translation
-export const DEFAULT_PROVIDER = PROVIDERS.GEMINI;
+export const DEFAULT_PROVIDER = PROVIDERS.GROQ;
 export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS.FLASH_LITE_2_5;
 export const DEFAULT_GROQ_MODEL = GROQ_MODELS.OSS_120B;
 
-// All available models for fallback (in priority order)
-export const ALL_AVAILABLE_MODELS = [
+// Gemini fallback models (in priority order)
+export const GEMINI_FALLBACK_MODELS = [
   GEMINI_MODELS.FLASH_LITE_2_5, // Try 2.5 Flash Lite first (default, fastest and lightest)
   GEMINI_MODELS.FLASH_2_5, // Then try 2.5 Flash (fast and balanced)
   GEMINI_MODELS.PRO_2_5, // Finally try 2.5 Pro (most accurate for complex tasks)
 ] as const;
+
+// Groq fallback models (in priority order)
+export const GROQ_FALLBACK_MODELS = [
+  GROQ_MODELS.OSS_120B, // Try OSS-120B first (default, most capable)
+  GROQ_MODELS.OSS_20B, // Then try OSS-20B (faster, still capable)
+  GROQ_MODELS.LLAMA_3_3_70B, // Then try Llama 3.3 70B
+  GROQ_MODELS.LLAMA_3_1_70B, // Then try Llama 3.1 70B
+  GROQ_MODELS.MIXTRAL_8X7B, // Finally try Mixtral
+] as const;
+
+// All available models for fallback (for backward compatibility)
+// @deprecated Use GEMINI_FALLBACK_MODELS or GROQ_FALLBACK_MODELS instead
+export const ALL_AVAILABLE_MODELS = GEMINI_FALLBACK_MODELS;
 
 // Input Sanitization
 export const MAX_CONSECUTIVE_SPACES = 3; // Maximum consecutive spaces before normalization

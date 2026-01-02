@@ -26,7 +26,7 @@
           "required": false,
           "title": "Translation Provider",
           "description": "Select the AI provider to use for translation",
-          "default": "gemini",
+          "default": "groq",
           "data": [
             {
               "title": "Google Gemini",
