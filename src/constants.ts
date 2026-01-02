@@ -21,6 +21,14 @@ export const MIN_ATTEMPT_TIMEOUT_MS = 1000; // 1s: Minimum timeout for any singl
 // Worst case: 2 attempts (initial + 1 retry) + 2 fallback models = 4 API calls max
 // Worst case time: ~60s (enforced by OVERALL_TIMEOUT_MS)
 
+// Translation Providers
+export const PROVIDERS = {
+  GEMINI: "gemini",
+  GROQ: "groq",
+} as const;
+
+export type ProviderName = (typeof PROVIDERS)[keyof typeof PROVIDERS];
+
 // Gemini Models Configuration
 export const GEMINI_MODELS = {
   PRO_2_5: "gemini-2.5-pro",
@@ -28,11 +36,27 @@ export const GEMINI_MODELS = {
   FLASH_LITE_2_5: "gemini-2.5-flash-lite",
 } as const;
 
+// Groq Models Configuration
+export const GROQ_MODELS = {
+  LLAMA_3_3_70B: "llama-3.3-70b-versatile",
+  LLAMA_3_1_70B: "llama-3.1-70b-versatile",
+  MIXTRAL_8X7B: "mixtral-8x7b-32768",
+} as const;
+
 // Type for Gemini model names (for better type safety)
 export type GeminiModelName = (typeof GEMINI_MODELS)[keyof typeof GEMINI_MODELS];
 
+// Type for Groq model names (for better type safety)
+export type GroqModelName = (typeof GROQ_MODELS)[keyof typeof GROQ_MODELS];
+
+// Union type for all model names
+export type ModelName = GeminiModelName | GroqModelName;
+
 // Valid Gemini models (pre-computed for performance)
 export const VALID_GEMINI_MODELS = Object.values(GEMINI_MODELS) as readonly GeminiModelName[];
+
+// Valid Groq models (pre-computed for performance)
+export const VALID_GROQ_MODELS = Object.values(GROQ_MODELS) as readonly GroqModelName[];
 
 /**
  * Type guard to check if a string is a valid Gemini model name
@@ -54,31 +78,78 @@ export function isValidGeminiModel(model: string): model is GeminiModelName {
 }
 
 /**
+ * Type guard to check if a string is a valid Groq model name
+ *
+ * @param model - The model name to check
+ * @returns true if the model is a valid GroqModelName, false otherwise
+ */
+export function isValidGroqModel(model: string): model is GroqModelName {
+  return VALID_GROQ_MODELS.includes(model as GroqModelName);
+}
+
+/**
+ * Type guard to check if a string is a valid provider name
+ *
+ * @param provider - The provider name to check
+ * @returns true if the provider is a valid ProviderName, false otherwise
+ */
+export function isValidProvider(provider: string): provider is ProviderName {
+  return provider === PROVIDERS.GEMINI || provider === PROVIDERS.GROQ;
+}
+
+/**
  * Display names for Gemini models (for UI)
  */
-export const MODEL_DISPLAY_NAMES: Record<GeminiModelName, string> = {
+export const GEMINI_MODEL_DISPLAY_NAMES: Record<GeminiModelName, string> = {
   [GEMINI_MODELS.PRO_2_5]: "Gemini 2.5 Pro",
   [GEMINI_MODELS.FLASH_2_5]: "Gemini 2.5 Flash",
   [GEMINI_MODELS.FLASH_LITE_2_5]: "Gemini 2.5 Flash Lite",
 } as const;
 
 /**
- * Get human-readable display name for a Gemini model
+ * Display names for Groq models (for UI)
+ */
+export const GROQ_MODEL_DISPLAY_NAMES: Record<GroqModelName, string> = {
+  [GROQ_MODELS.LLAMA_3_3_70B]: "Llama 3.3 70B Versatile",
+  [GROQ_MODELS.LLAMA_3_1_70B]: "Llama 3.1 70B Versatile",
+  [GROQ_MODELS.MIXTRAL_8X7B]: "Mixtral 8x7B",
+} as const;
+
+/**
+ * Display names for providers (for UI)
+ */
+export const PROVIDER_DISPLAY_NAMES: Record<ProviderName, string> = {
+  [PROVIDERS.GEMINI]: "Google Gemini",
+  [PROVIDERS.GROQ]: "Groq",
+} as const;
+
+/**
+ * Get human-readable display name for a model
  *
  * @param model - The model name
+ * @param provider - The provider name
  * @returns The display name for the model
  *
  * @example
  * ```typescript
- * getModelDisplayName(GEMINI_MODELS.FLASH_2_5); // "Gemini 2.5 Flash"
+ * getModelDisplayName(GEMINI_MODELS.FLASH_2_5, PROVIDERS.GEMINI); // "Gemini 2.5 Flash"
+ * getModelDisplayName(GROQ_MODELS.LLAMA_3_3_70B, PROVIDERS.GROQ); // "Llama 3.3 70B Versatile"
  * ```
  */
-export function getModelDisplayName(model: GeminiModelName): string {
-  return MODEL_DISPLAY_NAMES[model];
+export function getModelDisplayName(model: ModelName, provider: ProviderName): string {
+  if (provider === PROVIDERS.GEMINI && isValidGeminiModel(model)) {
+    return GEMINI_MODEL_DISPLAY_NAMES[model];
+  }
+  if (provider === PROVIDERS.GROQ && isValidGroqModel(model)) {
+    return GROQ_MODEL_DISPLAY_NAMES[model];
+  }
+  return model; // Fallback to model name itself
 }
 
-// Default model for translation
+// Default provider and models for translation
+export const DEFAULT_PROVIDER = PROVIDERS.GEMINI;
 export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS.FLASH_LITE_2_5;
+export const DEFAULT_GROQ_MODEL = GROQ_MODELS.LLAMA_3_3_70B;
 
 // All available models for fallback (in priority order)
 export const ALL_AVAILABLE_MODELS = [
@@ -95,19 +166,30 @@ export const CONSECUTIVE_SPACES_PATTERN = / {3,}/g; // Matches 3 or more consecu
 // API Key Validation
 // Gemini API keys format: AIza[A-Za-z0-9_-]{35}
 // Example: AIzaSyD1234567890abcdefghijklmnopqrstuvwxyz
-export const API_KEY_PREFIX = "AIza"; // Standard Gemini API key prefix
+export const GEMINI_API_KEY_PREFIX = "AIza"; // Standard Gemini API key prefix
 
-// Flexible pattern for various key formats (supports older/different formats)
-export const API_KEY_FLEXIBLE_PATTERN = /^AI[A-Za-z0-9_-]{28,}$/;
+// Groq API keys format: gsk_[A-Za-z0-9]{40+}
+// Example: gsk_1234567890abcdefghijklmnopqrstuvwxyz1234
+export const GROQ_API_KEY_PREFIX = "gsk_"; // Standard Groq API key prefix
+
+// Flexible pattern for various Gemini key formats (supports older/different formats)
+export const GEMINI_API_KEY_FLEXIBLE_PATTERN = /^AI[A-Za-z0-9_-]{28,}$/;
+
+// Flexible pattern for Groq API keys
+export const GROQ_API_KEY_PATTERN = /^gsk_[A-Za-z0-9]{40,}$/;
 
 // Error Messages
 export const ERROR_MESSAGES = {
   EMPTY_TEXT: "Text to translate cannot be empty",
   TEXT_TOO_LONG: (length: number) =>
     `Text is too long (${length} characters). Maximum allowed: ${MAX_TEXT_LENGTH} characters`,
-  API_KEY_REQUIRED: "Gemini API key is required",
-  API_KEY_INVALID_FORMAT:
-    "Invalid API key format. Please set a valid Gemini API key in preferences.\n\nGet your API key from: https://makersuite.google.com/app/apikey",
+  API_KEY_REQUIRED: (provider: ProviderName) => `${PROVIDER_DISPLAY_NAMES[provider]} API key is required`,
+  API_KEY_INVALID_FORMAT: (provider: ProviderName) => {
+    if (provider === PROVIDERS.GEMINI) {
+      return "Invalid API key format. Please set a valid Gemini API key in preferences.\\n\\nGet your API key from: https://makersuite.google.com/app/apikey";
+    }
+    return "Invalid API key format. Please set a valid Groq API key in preferences.\\n\\nGet your API key from: https://console.groq.com/keys";
+  },
   NO_TEXT_TO_TRANSLATE:
     "No text to translate.\n\nPlease either:\n1. Select text before running this command, or\n2. Copy text to clipboard",
   NO_RESPONSE: "No response received from Gemini API",
